@@ -1,0 +1,46 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "uo-b-authorised-absence-app-client-side-solution",
+    "id": "78f38e7b-27a4-4911-bd5d-d3da0176b01b",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.23.0"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "UoBAuthorisedAbsenceApp description"
+      },
+      "longDescription": {
+        "default": "UoBAuthorisedAbsenceApp description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "uo-b-authorised-absence-app Feature",
+        "description": "The feature that activates elements of the uo-b-authorised-absence-app solution.",
+        "id": "69a4d5c8-8c84-4cde-abb9-8902e6c828c1",
+        "version": "1.0.0.0",
+        "assets": {
+          "elementManifests": [
+            "elements.xml",
+            "ClientSideInstance.xml"
+          ]
+        }
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/uo-b-authorised-absence-app.sppkg"
+  }
+}

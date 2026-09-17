@@ -1,0 +1,27 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "authorised-absence-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/authorisedAbsence/AuthorisedAbsenceWebPart.js",
+          "manifest": "./src/webparts/authorisedAbsence/AuthorisedAbsenceWebPart.manifest.json"
+        }
+      ]
+    },
+    "uo-b-application-customizer-application-customizer": {
+      "components": [
+        {
+          "entrypoint": "./lib/extensions/uoBApplicationCustomizer/UoBApplicationCustomizerApplicationCustomizer.js",
+          "manifest": "./src/extensions/uoBApplicationCustomizer/UoBApplicationCustomizerApplicationCustomizer.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "AuthorisedAbsenceWebPartStrings": "lib/webparts/authorisedAbsence/loc/{locale}.js",
+    "UoBApplicationCustomizerApplicationCustomizerStrings": "lib/extensions/uoBApplicationCustomizer/loc/{locale}.js"
+  }
+}
