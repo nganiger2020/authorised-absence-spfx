@@ -1,4 +1,9 @@
 import { SPFI } from "@pnp/sp";
+import { WebPartContext } from "@microsoft/sp-webpart-base";
+import {
+  SPHttpClient,
+  SPHttpClientResponse
+} from "@microsoft/sp-http";
 
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
@@ -8,65 +13,66 @@ import "@pnp/sp/site-users/web";
 import "@pnp/sp/site-groups/web";
 
 import {
-  IRequest,
-  UserRole,
   IAttachmentInfo,
-  IUserOption
+  ICurrentUser,
+  IGroupInfo,
+  IRequest,
+  IUserOption,
+  UserRole
 } from "../models/Models";
 
-import {
-  AppConfig
-} from "../config/AppConfig";
+import { AppConfig } from "../config/AppConfig";
 
 
-/* =========================================================
-   SHAREPOINT TYPES
-   ========================================================= */
-
-interface ICurrentUser {
-  Id: number;
-  Title: string;
-  Email?: string;
-  LoginName?: string;
-}
-
-interface IGroupInfo {
-  Id: number;
-  Title: string;
-}
-
-interface IListItemAddResult {
-  Id: number;
+interface IPeoplePickerEntity {
+  Key?: string;
+  DisplayText?: string;
+  Description?: string;
+  EntityType?: string;
+  EntityData?: {
+    Email?: string;
+    AccountName?: string;
+    PrincipalType?: string;
+    SPUserID?: string;
+  };
 }
 
 
-/* =========================================================
-   REQUEST SERVICE
-   ========================================================= */
+interface IPeoplePickerResponse {
+  value?: string;
+  d?: {
+    ClientPeoplePickerSearchUser?: string;
+  };
+}
+
 
 export class RequestService {
 
   private readonly sp: SPFI;
 
+  private readonly context: WebPartContext;
+
 
   public constructor(
-    sp: SPFI
+    sp: SPFI,
+    context: WebPartContext
   ) {
 
     this.sp = sp;
+
+    this.context = context;
   }
 
 
   /* =====================================================
-     REQUEST LIST
+     LIST
      ===================================================== */
 
   private get requestList() {
 
-    return this.sp.web.lists
-      .getByTitle(
-        AppConfig.requestsListTitle
-      );
+    return this.sp.web.lists.getByTitle(
+      AppConfig.requestsListTitle
+    );
   }
 
 
@@ -75,49 +81,37 @@ export class RequestService {
      ===================================================== */
 
   public async currentUser():
-    Promise<ICurrentUser> {
+  Promise<ICurrentUser> {
 
     const user =
       await this.sp.web.currentUser();
 
+
     return {
-      Id: user.Id,
-      Title: user.Title,
-      Email: user.Email,
-      LoginName: user.LoginName
+
+      Id:
+        user.Id,
+
+      Title:
+        user.Title || "",
+
+      Email:
+        user.Email || "",
+
+      LoginName:
+        user.LoginName || ""
     };
   }
 
 
-  public async getSiteUsers(): Promise<IUserOption[]> {
-    const users = await this.sp.web.siteUsers
-      .select("Id", "Title", "Email")();
-
-    const result: IUserOption[] = [];
-    for (let i = 0; i < users.length; i++) {
-      if (users[i].Id && users[i].Title) {
-        result.push({
-          Id: users[i].Id,
-          Title: users[i].Title,
-          Email: users[i].Email
-        });
-      }
-    }
-
-    result.sort((a, b) => a.Title.localeCompare(b.Title));
-    return result;
-  }
-
-
   /* =====================================================
-     RESOLVE USER ROLE
+     ROLE
      ===================================================== */
 
   public async resolveRole():
-    Promise<UserRole> {
+  Promise<UserRole> {
 
-    const groups:
-      IGroupInfo[] =
+    const groups =
       await this.sp.web.currentUser
         .groups
         .select(
@@ -126,8 +120,31 @@ export class RequestService {
         )();
 
 
+    const currentGroups =
+      groups as IGroupInfo[];
+
+
+    const adminGroup =
+      (
+        AppConfig.adminGroupName ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+
+    const approverGroup =
+      (
+        AppConfig.approverGroupName ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+
     let isAdmin =
       false;
+
 
     let isApprover =
       false;
@@ -135,51 +152,48 @@ export class RequestService {
 
     for (
       let i = 0;
-      i < groups.length;
+      i < currentGroups.length;
       i++
     ) {
 
-      const groupName =
+      const title =
         (
-          groups[i].Title ||
+          currentGroups[i].Title ||
           ""
-        ).toLowerCase();
+        )
+          .trim()
+          .toLowerCase();
 
 
       if (
-        groupName ===
-        AppConfig.adminGroupName
-          .toLowerCase()
+        title === adminGroup
       ) {
 
-        isAdmin =
-          true;
+        isAdmin = true;
       }
 
 
       if (
-        groupName ===
-        AppConfig.approverGroupName
-          .toLowerCase()
+        title === approverGroup
       ) {
 
-        isApprover =
-          true;
+        isApprover = true;
       }
     }
 
 
-    /*
-     * Admin takes precedence if
-     * user belongs to both groups.
-     */
+    if (
+      isAdmin
+    ) {
 
-    if (isAdmin) {
       return "Admin";
     }
 
 
-    if (isApprover) {
+    if (
+      isApprover
+    ) {
+
       return "Approver";
     }
 
@@ -189,11 +203,422 @@ export class RequestService {
 
 
   /* =====================================================
-     COMMON SELECT
+     PEOPLE DIRECTORY SEARCH
+
+     Searches SharePoint's server-side People Picker
+     instead of siteUsers.
+
+     This can resolve users from the tenant directory
+     who are not yet present in the site's User
+     Information List.
+     ===================================================== */
+
+  public async getSiteUsers():
+  Promise<IUserOption[]> {
+
+    const users =
+      await this.sp.web.siteUsers
+        .select(
+          "Id",
+          "Title",
+          "Email",
+          "LoginName"
+        )();
+
+    return users
+      .filter(user => !!user.Id && !!user.Title)
+      .map(user => ({
+        Id: user.Id,
+        Title: user.Title || "",
+        Email: user.Email || "",
+        LoginName: user.LoginName || ""
+      }));
+  }
+
+
+  /* =====================================================
+     DIRECTORY USER SEARCH
+     ===================================================== */
+
+  public async searchUsers(
+    searchText: string
+  ):
+  Promise<IUserOption[]> {
+
+    const query =
+      searchText
+        ? searchText.trim()
+        : "";
+
+
+    if (
+      query.length < 2
+    ) {
+
+      return [];
+    }
+
+
+    const webUrl =
+      this.context.pageContext.web.absoluteUrl;
+
+
+    const endpoint =
+      webUrl +
+      "/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser";
+
+
+    /*
+     * PrincipalType values:
+     *
+     * User              = 1
+     * DistributionList  = 2
+     * SecurityGroup     = 4
+     * SharePointGroup   = 8
+     *
+     * We only want individual users.
+     */
+    const queryParams = {
+
+      AllowEmailAddresses:
+        true,
+
+      AllowMultipleEntities:
+        false,
+
+      AllUrlZones:
+        false,
+
+      MaximumEntitySuggestions:
+        15,
+
+      PrincipalSource:
+        15,
+
+      PrincipalType:
+        1,
+
+      QueryString:
+        query,
+
+      SharePointGroupID:
+        0
+    };
+
+
+    const body =
+      JSON.stringify({
+
+        queryParams:
+          queryParams
+      });
+
+
+    let response:
+      SPHttpClientResponse;
+
+
+    try {
+
+      response =
+        await this.context.spHttpClient.post(
+
+          endpoint,
+
+          SPHttpClient.configurations.v1,
+
+          {
+
+            headers: {
+
+              "Accept":
+                "application/json;odata=verbose",
+
+              "Content-Type":
+                "application/json;odata=verbose"
+            },
+
+            body:
+              body
+          }
+        );
+
+    } catch (error) {
+
+      console.error(
+        "People Picker HTTP request failed.",
+        error
+      );
+
+
+      throw new Error(
+        "Unable to search the SharePoint people directory."
+      );
+    }
+
+
+    if (
+      !response.ok
+    ) {
+
+      const responseText =
+        await response.text();
+
+
+      console.error(
+        "People Picker search failed.",
+        response.status,
+        response.statusText,
+        responseText
+      );
+
+
+      throw new Error(
+        "People search failed with HTTP status " +
+        response.status +
+        "."
+      );
+    }
+
+
+    const json =
+      await response.json() as
+        IPeoplePickerResponse;
+
+
+    const encodedResults =
+      json.value ||
+      (
+        json.d
+          ? json.d.ClientPeoplePickerSearchUser
+          : undefined
+      );
+
+
+    if (
+      !encodedResults
+    ) {
+
+      return [];
+    }
+
+
+    let entities:
+      IPeoplePickerEntity[] = [];
+
+
+    try {
+
+      entities =
+        JSON.parse(
+          encodedResults
+        ) as IPeoplePickerEntity[];
+
+    } catch (error) {
+
+      console.error(
+        "Unable to parse People Picker results.",
+        error,
+        encodedResults
+      );
+
+
+      return [];
+    }
+
+
+    const users:
+      IUserOption[] = [];
+
+
+    const seen:
+      Record<string, boolean> = {};
+
+
+    for (
+      let i = 0;
+      i < entities.length;
+      i++
+    ) {
+
+      const entity =
+        entities[i];
+
+
+      if (
+        entity.EntityType &&
+        entity.EntityType.toLowerCase() !==
+        "user"
+      ) {
+
+        continue;
+      }
+
+
+      const loginName =
+        (
+          entity.Key ||
+          (
+            entity.EntityData
+              ? entity.EntityData.AccountName
+              : ""
+          ) ||
+          ""
+        ).trim();
+
+
+      const title =
+        (
+          entity.DisplayText ||
+          entity.Description ||
+          ""
+        ).trim();
+
+
+      const email =
+        (
+          entity.EntityData &&
+          entity.EntityData.Email
+            ? entity.EntityData.Email
+            : ""
+        ).trim();
+
+
+      if (
+        !loginName
+      ) {
+
+        continue;
+      }
+
+
+      const uniqueKey =
+        loginName.toLowerCase();
+
+
+      if (
+        seen[uniqueKey]
+      ) {
+
+        continue;
+      }
+
+
+      seen[uniqueKey] =
+        true;
+
+
+      /*
+       * A directory search result may not yet
+       * have a valid SharePoint user ID.
+
+       * Id = 0 is intentional here.
+       *
+       * ensureUser() is called after selection
+       * to obtain the actual SharePoint ID.
+       */
+      users.push({
+
+        Id:
+          0,
+
+        Title:
+          title ||
+          email ||
+          loginName,
+
+        Email:
+          email,
+
+        LoginName:
+          loginName
+      });
+    }
+
+
+    return users;
+  }
+
+
+  /* =====================================================
+     ENSURE USER
+
+     Converts a directory result into an actual
+     SharePoint user and gives us the ID needed
+     by Person fields.
+     ===================================================== */
+
+  public async ensureUser(
+    loginName: string
+  ):
+  Promise<IUserOption> {
+
+    const value =
+      loginName
+        ? loginName.trim()
+        : "";
+
+
+    if (
+      !value
+    ) {
+
+      throw new Error(
+        "A login name is required."
+      );
+    }
+
+
+    try {
+
+      /*
+       * PnPjs v4 returns ISiteUserInfo directly.
+       */
+      const user =
+        await this.sp.web.ensureUser(
+          value
+        );
+
+
+      return {
+
+        Id:
+          user.Id,
+
+        Title:
+          user.Title || value,
+
+        Email:
+          user.Email || "",
+
+        LoginName:
+          user.LoginName || value
+      };
+
+    } catch (error) {
+
+      console.error(
+        "Unable to ensure SharePoint user.",
+        error
+      );
+
+
+      throw new Error(
+        this.getErrorMessage(
+          error,
+          "Unable to resolve the selected user."
+        )
+      );
+    }
+  }
+
+
+  /* =====================================================
+     SELECT
      ===================================================== */
 
   private getSelectFields():
-    string[] {
+  string[] {
 
     return [
 
@@ -256,25 +681,29 @@ export class RequestService {
 
       "Created",
       "Modified",
-
       "Attachments",
 
+      "StudentId",
       "Student/Id",
       "Student/Title",
       "Student/EMail",
 
+      "SignatoryId",
       "Signatory/Id",
       "Signatory/Title",
       "Signatory/EMail",
 
+      "AdministratorId",
       "Administrator/Id",
       "Administrator/Title",
       "Administrator/EMail",
 
+      "AuthorId",
       "Author/Id",
       "Author/Title",
       "Author/EMail",
 
+      "EditorId",
       "Editor/Id",
       "Editor/Title",
       "Editor/EMail"
@@ -282,14 +711,11 @@ export class RequestService {
   }
 
 
-  /* =====================================================
-     COMMON EXPAND
-     ===================================================== */
-
   private getExpandFields():
-    string[] {
+  string[] {
 
     return [
+
       "Student",
       "Signatory",
       "Administrator",
@@ -300,28 +726,104 @@ export class RequestService {
 
 
   /* =====================================================
-     GET DASHBOARD
+     NORMALISE
+     ===================================================== */
+
+  private normalizeRequest(
+    request: IRequest
+  ):
+  IRequest {
+
+    return {
+
+      ...request,
+
+      Title:
+        request.Title || "",
+
+      Stage:
+        request.Stage || "Student",
+
+      Status:
+        request.Status || "Draft",
+
+      AbsenceReasons:
+        request.AbsenceReasons
+          ? request.AbsenceReasons.slice()
+          : [],
+
+      AbsenceReasonsConfirm:
+        request.AbsenceReasonsConfirm
+          ? request.AbsenceReasonsConfirm.slice()
+          : [],
+
+      MonitoringConditions:
+        request.MonitoringConditions
+          ? request.MonitoringConditions.slice()
+          : [],
+
+      AttachmentFiles:
+        request.AttachmentFiles
+          ? request.AttachmentFiles.slice()
+          : []
+    };
+  }
+
+
+  private normalizeRequests(
+    requests: IRequest[]
+  ):
+  IRequest[] {
+
+    const result:
+      IRequest[] = [];
+
+
+    for (
+      let i = 0;
+      i < requests.length;
+      i++
+    ) {
+
+      result.push(
+        this.normalizeRequest(
+          requests[i]
+        )
+      );
+    }
+
+
+    return result;
+  }
+
+
+  /* =====================================================
+     DASHBOARD
      ===================================================== */
 
   public async getDashboard(
     role: UserRole,
     userId: number
-  ): Promise<IRequest[]> {
+  ):
+  Promise<IRequest[]> {
 
-    /*
-     * STUDENT
-     *
-     * Student only sees requests where
-     * the Student person field points
-     * to the logged-in user.
-     */
+    if (
+      !userId
+    ) {
+
+      throw new Error(
+        "Current SharePoint user ID is required."
+      );
+    }
+
 
     if (
       role === "Student"
     ) {
 
-      const studentItems =
-        await this.requestList.items
+      const items =
+        await this.requestList
+          .items
           .select(
             ...this.getSelectFields()
           )
@@ -338,25 +840,19 @@ export class RequestService {
           )();
 
 
-      return studentItems as
-        unknown as IRequest[];
+      return this.normalizeRequests(
+        items as unknown as IRequest[]
+      );
     }
 
-
-    /*
-     * APPROVER
-     *
-     * Signatory only sees requests
-     * assigned through the Signatory
-     * person field.
-     */
 
     if (
       role === "Approver"
     ) {
 
-      const approverItems =
-        await this.requestList.items
+      const items =
+        await this.requestList
+          .items
           .select(
             ...this.getSelectFields()
           )
@@ -373,19 +869,18 @@ export class RequestService {
           )();
 
 
-      return approverItems as
-        unknown as IRequest[];
+      return this.normalizeRequests(
+        items as unknown as IRequest[]
+      );
     }
 
 
     /*
-     * ADMIN
-     *
      * Admin sees all requests.
      */
-
-    const adminItems =
-      await this.requestList.items
+    const items =
+      await this.requestList
+        .items
         .select(
           ...this.getSelectFields()
         )
@@ -398,8 +893,9 @@ export class RequestService {
         )();
 
 
-    return adminItems as
-      unknown as IRequest[];
+    return this.normalizeRequests(
+      items as unknown as IRequest[]
+    );
   }
 
 
@@ -409,11 +905,20 @@ export class RequestService {
 
   public async get(
     id: number
-  ): Promise<IRequest> {
+  ):
+  Promise<IRequest> {
+
+    this.validateRequestId(
+      id
+    );
+
 
     const item =
-      await this.requestList.items
-        .getById(id)
+      await this.requestList
+        .items
+        .getById(
+          id
+        )
         .select(
           ...this.getSelectFields()
         )
@@ -423,8 +928,11 @@ export class RequestService {
 
 
     const attachments =
-      await this.requestList.items
-        .getById(id)
+      await this.requestList
+        .items
+        .getById(
+          id
+        )
         .attachmentFiles
         .select(
           "FileName",
@@ -432,458 +940,297 @@ export class RequestService {
         )();
 
 
-    const request =
-      item as unknown as IRequest;
+    return this.normalizeRequest({
 
-
-    /*
-     * Create a new object rather than
-     * mutating the returned SharePoint
-     * item.
-     */
-
-    return {
-      ...request,
+      ...(
+        item as unknown as IRequest
+      ),
 
       AttachmentFiles:
-        attachments as
-          unknown as
+        attachments as unknown as
           IAttachmentInfo[]
+    });
+  }
+
+
+  /* =====================================================
+     PAYLOAD
+     ===================================================== */
+
+  private buildPayload(
+    request: IRequest
+  ):
+  Record<string, unknown> {
+
+    return {
+
+      Title:
+        this.valueOrEmpty(
+          request.Title
+        ),
+
+      Stage:
+        request.Stage ||
+        "Student",
+
+      Status:
+        request.Status ||
+        "Draft",
+
+      StudentId:
+        request.StudentId ||
+        null,
+
+      LevelOfStudy:
+        this.nullIfEmpty(
+          request.LevelOfStudy
+        ),
+
+      DoB:
+        this.nullIfEmpty(
+          request.DoB
+        ),
+
+      Programme:
+        this.nullIfEmpty(
+          request.Programme
+        ),
+
+      VisaType:
+        this.nullIfEmpty(
+          request.VisaType
+        ),
+
+      VisaOtherComments:
+        this.nullIfEmpty(
+          request.VisaOtherComments
+        ),
+
+      VisaStartDate:
+        this.nullIfEmpty(
+          request.VisaStartDate
+        ),
+
+      VisaEndDate:
+        this.nullIfEmpty(
+          request.VisaEndDate
+        ),
+
+      VisaAttachment:
+        this.nullIfEmpty(
+          request.VisaAttachment
+        ),
+
+      PassportAttachment:
+        this.nullIfEmpty(
+          request.PassportAttachment
+        ),
+
+      AbsenceStartDate:
+        this.nullIfEmpty(
+          request.AbsenceStartDate
+        ),
+
+      AbsenceEndDate:
+        this.nullIfEmpty(
+          request.AbsenceEndDate
+        ),
+
+      AbsenceReasons:
+        request.AbsenceReasons
+          ? request.AbsenceReasons.slice()
+          : [],
+
+      ReasonOtherComments:
+        this.nullIfEmpty(
+          request.ReasonOtherComments
+        ),
+
+      ConferenceAttachment:
+        this.nullIfEmpty(
+          request.ConferenceAttachment
+        ),
+
+      FamilyIllnessDetails:
+        this.nullIfEmpty(
+          request.FamilyIllnessDetails
+        ),
+
+      FamilyIllnessAttachment:
+        this.nullIfEmpty(
+          request.FamilyIllnessAttachment
+        ),
+
+      HolidayUGAttachment:
+        this.nullIfEmpty(
+          request.HolidayUGAttachment
+        ),
+
+      HolidayUGOtherAttachment:
+        this.nullIfEmpty(
+          request.HolidayUGOtherAttachment
+        ),
+
+      OtherAttachment:
+        this.nullIfEmpty(
+          request.OtherAttachment
+        ),
+
+      MedicalAttachment:
+        this.nullIfEmpty(
+          request.MedicalAttachment
+        ),
+
+      MedicalEvidenceDetails:
+        this.nullIfEmpty(
+          request.MedicalEvidenceDetails
+        ),
+
+      Returning:
+        this.nullIfEmpty(
+          request.Returning
+        ),
+
+      ReasonsNotReturning:
+        this.nullIfEmpty(
+          request.ReasonsNotReturning
+        ),
+
+      TravelOutside:
+        this.nullIfEmpty(
+          request.TravelOutside
+        ),
+
+      TravelOutsideDetails:
+        this.nullIfEmpty(
+          request.TravelOutsideDetails
+        ),
+
+      SignatoryId:
+        request.SignatoryId ||
+        null,
+
+      AbsenceReasonsConfirm:
+        request.AbsenceReasonsConfirm
+          ? request.AbsenceReasonsConfirm.slice()
+          : [],
+
+      MissSessions:
+        this.nullIfEmpty(
+          request.MissSessions
+        ),
+
+      MissSessionsRationale:
+        this.nullIfEmpty(
+          request.MissSessionsRationale
+        ),
+
+      ReasonConfOtherComments:
+        this.nullIfEmpty(
+          request.ReasonConfOtherComments
+        ),
+
+      MonitoringConditions:
+        request.MonitoringConditions
+          ? request.MonitoringConditions.slice()
+          : [],
+
+      AbsenceMonitoringDetails:
+        this.nullIfEmpty(
+          request.AbsenceMonitoringDetails
+        ),
+
+      RequestApproved:
+        this.nullIfEmpty(
+          request.RequestApproved
+        ),
+
+      RequestRejectionDetails:
+        this.nullIfEmpty(
+          request.RequestRejectionDetails
+        ),
+
+      AdministratorId:
+        request.AdministratorId ||
+        null,
+
+      letterofconfirmationforauthorise:
+        this.nullIfEmpty(
+          request
+            .letterofconfirmationforauthorise
+        ),
+
+      Reasonforrequestingaletter:
+        this.nullIfEmpty(
+          request
+            .Reasonforrequestingaletter
+        )
     };
   }
 
 
   /* =====================================================
-     CREATE PAYLOAD
+     CREATE
      ===================================================== */
 
-  private buildPayload(
+  public async create(
     request: IRequest
-  ): Record<string, unknown> {
-
-    const payload:
-      Record<string, unknown> = {
-
-        Title:
-          request.Title ||
-          "",
-
-        Stage:
-          request.Stage ||
-          "Student",
-
-        Status:
-          request.Status ||
-          "Draft",
-
-        LevelOfStudy:
-          request.LevelOfStudy ||
-          null,
-
-        DoB:
-          request.DoB ||
-          null,
-
-        Programme:
-          request.Programme ||
-          null,
-
-        VisaType:
-          request.VisaType ||
-          null,
-
-        VisaOtherComments:
-          request.VisaOtherComments ||
-          null,
-
-        VisaStartDate:
-          request.VisaStartDate ||
-          null,
-
-        VisaEndDate:
-          request.VisaEndDate ||
-          null,
-
-        VisaAttachment:
-          request.VisaAttachment ||
-          null,
-
-        PassportAttachment:
-          request.PassportAttachment ||
-          null,
-
-        AbsenceStartDate:
-          request.AbsenceStartDate ||
-          null,
-
-        AbsenceEndDate:
-          request.AbsenceEndDate ||
-          null,
-
-        AbsenceReasons:
-          request.AbsenceReasons ||
-          [],
-
-        ReasonOtherComments:
-          request.ReasonOtherComments ||
-          null,
-
-        ConferenceAttachment:
-          request.ConferenceAttachment ||
-          null,
-
-        FamilyIllnessDetails:
-          request.FamilyIllnessDetails ||
-          null,
-
-        FamilyIllnessAttachment:
-          request.FamilyIllnessAttachment ||
-          null,
-
-        HolidayUGAttachment:
-          request.HolidayUGAttachment ||
-          null,
-
-        HolidayUGOtherAttachment:
-          request.HolidayUGOtherAttachment ||
-          null,
-
-        OtherAttachment:
-          request.OtherAttachment ||
-          null,
-
-        MedicalAttachment:
-          request.MedicalAttachment ||
-          null,
-
-        MedicalEvidenceDetails:
-          request.MedicalEvidenceDetails ||
-          null,
-
-        Returning:
-          request.Returning ||
-          null,
-
-        ReasonsNotReturning:
-          request.ReasonsNotReturning ||
-          null,
-
-        TravelOutside:
-          request.TravelOutside ||
-          null,
-
-        TravelOutsideDetails:
-          request.TravelOutsideDetails ||
-          null,
-
-        AbsenceReasonsConfirm:
-          request.AbsenceReasonsConfirm ||
-          [],
-
-        MissSessions:
-          request.MissSessions ||
-          null,
-
-        MissSessionsRationale:
-          request.MissSessionsRationale ||
-          null,
-
-        ReasonConfOtherComments:
-          request.ReasonConfOtherComments ||
-          null,
-
-        MonitoringConditions:
-          request.MonitoringConditions ||
-          [],
-
-        AbsenceMonitoringDetails:
-          request.AbsenceMonitoringDetails ||
-          null,
-
-        RequestApproved:
-          request.RequestApproved ||
-          null,
-
-        RequestRejectionDetails:
-          request.RequestRejectionDetails ||
-          null,
-
-        letterofconfirmationforauthorise:
-          request
-            .letterofconfirmationforauthorise ||
-          null,
-
-        Reasonforrequestingaletter:
-          request
-            .Reasonforrequestingaletter ||
-          null
-      };
-
-
-    /*
-     * SharePoint Person fields must use
-     * <InternalName>Id.
-     */
-
-    if (
-      request.StudentId
-    ) {
-
-      payload.StudentId =
-        request.StudentId;
-    }
-
-
-    if (
-      request.SignatoryId
-    ) {
-
-      payload.SignatoryId =
-        request.SignatoryId;
-    }
-
-
-    if (
-      request.AdministratorId
-    ) {
-
-      payload.AdministratorId =
-        request.AdministratorId;
-    }
-
-
-    return payload;
-  }
-
-
-  /* =====================================================
-     CREATE REQUEST
-     ===================================================== */
-
-  private async create(
-    request: IRequest
-  ): Promise<number> {
-
-    const payload =
-      this.buildPayload(
-        request
-      );
-
+  ):
+  Promise<number> {
 
     const result =
-      await this.requestList.items
+      await this.requestList
+        .items
         .add(
-          payload
+          this.buildPayload(
+            request
+          )
         );
 
 
-    const addedItem =
-      result as
-        unknown as
-        IListItemAddResult;
-
-
     if (
-      !addedItem.Id
+      !result.Id
     ) {
 
       throw new Error(
-        "SharePoint created the request but did not return an item ID."
+        "SharePoint did not return the new request ID."
       );
     }
 
 
-    return addedItem.Id;
+    return result.Id;
   }
 
 
   /* =====================================================
-     UPDATE REQUEST
+     UPDATE
      ===================================================== */
 
-  private async update(
-    id: number,
+  public async update(
     request: IRequest
-  ): Promise<void> {
+  ):
+  Promise<void> {
 
-    const payload =
-      this.buildPayload(
-        request
+    if (
+      !request.Id
+    ) {
+
+      throw new Error(
+        "Request ID is required."
       );
+    }
 
 
-    await this.requestList.items
-      .getById(id)
+    await this.requestList
+      .items
+      .getById(
+        request.Id
+      )
       .update(
-        payload
+        this.buildPayload(
+          request
+        )
       );
-  }
-
-
-  /* =====================================================
-     SAVE DRAFT
-     ===================================================== */
-
-  public async saveDraft(
-    request: IRequest,
-    files: File[],
-    deletedFiles: string[]
-  ): Promise<number> {
-
-    /*
-     * Immutable request object.
-     */
-
-    const draftRequest:
-      IRequest = {
-
-        ...request,
-
-        Stage:
-          request.Stage ||
-          "Student",
-
-        Status:
-          "Draft"
-      };
-
-
-    let itemId:
-      number;
-
-
-    if (
-      draftRequest.Id
-    ) {
-
-      itemId =
-        draftRequest.Id;
-
-
-      await this.update(
-        itemId,
-        draftRequest
-      );
-
-    } else {
-
-      itemId =
-        await this.create(
-          draftRequest
-        );
-    }
-
-
-    await this.processAttachments(
-      itemId,
-      files,
-      deletedFiles
-    );
-
-
-    return itemId;
-  }
-
-
-
-
-  /* =====================================================
-     ADMIN SAVE - PRESERVE WORKFLOW STATUS
-     ===================================================== */
-
-  public async adminSave(
-    request: IRequest,
-    files: File[],
-    deletedFiles: string[]
-  ): Promise<number> {
-
-    let itemId: number;
-
-    if (request.Id) {
-      itemId = request.Id;
-      await this.update(itemId, request);
-    } else {
-      itemId = await this.create(request);
-    }
-
-    await this.processAttachments(itemId, files, deletedFiles);
-    return itemId;
-  }
-
-  /* =====================================================
-     SUBMIT REQUEST
-     ===================================================== */
-
-  public async submit(
-    request: IRequest,
-    files: File[],
-    deletedFiles: string[]
-  ): Promise<number> {
-
-    /*
-     * When submitted, the request moves
-     * from the Student stage into the
-     * Signatory approval stage.
-     *
-     * IMPORTANT:
-     * SignatoryId must already have been
-     * assigned, or must be resolved by
-     * your programme/signatory mapping.
-     */
-
-    const submittedRequest:
-      IRequest = {
-
-        ...request,
-
-        Stage:
-          "Signatory",
-
-        Status:
-          "Pending Approval",
-
-        RequestApproved:
-          undefined,
-
-        RequestRejectionDetails:
-          undefined
-      };
-
-
-    let itemId:
-      number;
-
-
-    if (
-      submittedRequest.Id
-    ) {
-
-      itemId =
-        submittedRequest.Id;
-
-
-      await this.update(
-        itemId,
-        submittedRequest
-      );
-
-    } else {
-
-      itemId =
-        await this.create(
-          submittedRequest
-        );
-    }
-
-
-    await this.processAttachments(
-      itemId,
-      files,
-      deletedFiles
-    );
-
-
-    return itemId;
   }
 
 
@@ -891,135 +1238,35 @@ export class RequestService {
      ATTACHMENTS
      ===================================================== */
 
-  private async processAttachments(
-    itemId: number,
-    files: File[],
-    deletedFiles: string[]
-  ): Promise<void> {
-
-    const item =
-      this.requestList.items
-        .getById(
-          itemId
-        );
-
-
-    /*
-     * DELETE ATTACHMENTS
-     */
-
-    for (
-      let i = 0;
-      i < deletedFiles.length;
-      i++
-    ) {
-
-      const fileName =
-        deletedFiles[i];
-
-
-      if (!fileName) {
-        continue;
-      }
-
-
-      try {
-
-        await item
-          .attachmentFiles
-          .getByName(
-            fileName
-          )
-          .delete();
-
-      } catch (err) {
-
-        console.error(
-          "Unable to delete attachment: " +
-          fileName,
-          err
-        );
-
-
-        throw new Error(
-          "Unable to delete attachment '" +
-          fileName +
-          "'."
-        );
-      }
-    }
-
-
-    /*
-     * ADD ATTACHMENTS
-     */
-
-    for (
-      let i = 0;
-      i < files.length;
-      i++
-    ) {
-
-      const file =
-        files[i];
-
-
-      if (!file) {
-        continue;
-      }
-
-
-      this.validateAttachment(
-        file
-      );
-
-
-      try {
-
-        /*
-         * PnPjs accepts Blob/File as the
-         * attachment content.
-         */
-
-        await item
-          .attachmentFiles
-          .add(
-            file.name,
-            file
-          );
-
-      } catch (err) {
-
-        console.error(
-          "Unable to upload attachment: " +
-          file.name,
-          err
-        );
-
-
-        throw new Error(
-          "Unable to upload attachment '" +
-          file.name +
-          "'."
-        );
-      }
-    }
-  }
-
-
-  /* =====================================================
-     VALIDATE ATTACHMENT
-     ===================================================== */
-
   private validateAttachment(
     file: File
-  ): void {
+  ):
+  void {
 
-    /*
-     * File size
-     */
+    if (
+      !file ||
+      !file.name
+    ) {
 
-    const maxSizeBytes =
+      throw new Error(
+        "Invalid attachment."
+      );
+    }
+
+
+    if (
+      file.size <= 0
+    ) {
+
+      throw new Error(
+        "The file '" +
+        file.name +
+        "' is empty."
+      );
+    }
+
+
+    const maxSize =
       AppConfig.maxAttachmentSizeMb *
       1024 *
       1024;
@@ -1027,53 +1274,35 @@ export class RequestService {
 
     if (
       file.size >
-      maxSizeBytes
+      maxSize
     ) {
 
       throw new Error(
         "The file '" +
         file.name +
-        "' exceeds the maximum file size of " +
+        "' exceeds " +
         AppConfig.maxAttachmentSizeMb +
         " MB."
       );
     }
 
 
-    /*
-     * Extension
-     */
-
-    const fileName =
+    const lowerName =
       file.name.toLowerCase();
 
 
-    const lastDot =
-      fileName.lastIndexOf(".");
+    const dot =
+      lowerName.lastIndexOf(".");
 
 
-    let extension =
-      "";
-
-
-    if (
-      lastDot !== -1
-    ) {
-
-      extension =
-        fileName.substring(
-          lastDot
-        );
-    }
-
-
-    const allowedExtensions =
-      AppConfig.allowedExtensions ||
-      [];
+    const extension =
+      dot >= 0
+        ? lowerName.substring(dot)
+        : "";
 
 
     if (
-      allowedExtensions.indexOf(
+      AppConfig.allowedExtensions.indexOf(
         extension
       ) === -1
     ) {
@@ -1087,16 +1316,445 @@ export class RequestService {
   }
 
 
+  private fileToArrayBuffer(
+    file: File
+  ):
+  Promise<ArrayBuffer> {
+
+    return new Promise<ArrayBuffer>(
+      (
+        resolve,
+        reject
+      ) => {
+
+        const reader =
+          new FileReader();
+
+
+        reader.onload =
+          (): void => {
+
+            if (
+              reader.result instanceof
+              ArrayBuffer
+            ) {
+
+              resolve(
+                reader.result
+              );
+
+              return;
+            }
+
+
+            reject(
+              new Error(
+                "Unable to read '" +
+                file.name +
+                "'."
+              )
+            );
+          };
+
+
+        reader.onerror =
+          (): void => {
+
+            reject(
+              new Error(
+                "Unable to read '" +
+                file.name +
+                "'."
+              )
+            );
+          };
+
+
+        reader.readAsArrayBuffer(
+          file
+        );
+      }
+    );
+  }
+
+
+  private async processAttachments(
+    itemId: number,
+    files: File[],
+    deletedFiles: string[]
+  ):
+  Promise<void> {
+
+    const item =
+      this.requestList
+        .items
+        .getById(
+          itemId
+        );
+
+
+    const deletes =
+      deletedFiles || [];
+
+
+    for (
+      let i = 0;
+      i < deletes.length;
+      i++
+    ) {
+
+      const fileName =
+        deletes[i];
+
+
+      if (
+        !fileName
+      ) {
+
+        continue;
+      }
+
+
+      await item
+        .attachmentFiles
+        .getByName(
+          fileName
+        )
+        .delete();
+    }
+
+
+    const uploads =
+      files || [];
+
+
+    for (
+      let i = 0;
+      i < uploads.length;
+      i++
+    ) {
+
+      const file =
+        uploads[i];
+
+
+      this.validateAttachment(
+        file
+      );
+
+
+      const content =
+        await this.fileToArrayBuffer(
+          file
+        );
+
+
+      await item
+        .attachmentFiles
+        .add(
+          file.name,
+          content
+        );
+    }
+  }
+
+
   /* =====================================================
-     MARK UNDER REVIEW
+     SAVE DRAFT
+     ===================================================== */
+
+  public async saveDraft(
+    request: IRequest,
+    files: File[],
+    deletedFiles: string[]
+  ):
+  Promise<IRequest> {
+
+    const draft:
+      IRequest = {
+
+        ...request,
+
+        Stage:
+          request.Stage ||
+          "Student",
+
+        Status:
+          "Draft"
+      };
+
+
+    let id =
+      draft.Id;
+
+
+    if (
+      id
+    ) {
+
+      await this.update(
+        draft
+      );
+
+    } else {
+
+      id =
+        await this.create(
+          draft
+        );
+    }
+
+
+    await this.processAttachments(
+      id,
+      files || [],
+      deletedFiles || []
+    );
+
+
+    return this.get(
+      id
+    );
+  }
+
+
+  /* =====================================================
+     GENERAL / ADMIN SAVE
+     ===================================================== */
+
+  public async save(
+    request: IRequest,
+    files: File[],
+    deletedFiles: string[]
+  ):
+  Promise<IRequest> {
+
+    let id =
+      request.Id;
+
+
+    if (
+      id
+    ) {
+
+      await this.update(
+        request
+      );
+
+    } else {
+
+      id =
+        await this.create(
+          request
+        );
+    }
+
+
+    await this.processAttachments(
+      id,
+      files || [],
+      deletedFiles || []
+    );
+
+
+    return this.get(
+      id
+    );
+  }
+
+
+  /* =====================================================
+     ADMIN SAVE
+     ===================================================== */
+
+  public async adminSave(
+    request: IRequest,
+    files: File[],
+    deletedFiles: string[]
+  ):
+  Promise<IRequest> {
+
+    return this.save(
+      request,
+      files || [],
+      deletedFiles || []
+    );
+  }
+
+
+  /* =====================================================
+     SUBMIT
+     ===================================================== */
+
+  public async submit(
+    request: IRequest,
+    files: File[],
+    deletedFiles: string[]
+  ):
+  Promise<IRequest> {
+
+    if (
+      !request.StudentId
+    ) {
+
+      throw new Error(
+        "A student must be selected before submitting."
+      );
+    }
+
+
+    if (
+      !request.Title ||
+      !request.Title.trim()
+    ) {
+
+      throw new Error(
+        "Student ID is required."
+      );
+    }
+
+
+    const submitted:
+      IRequest = {
+
+        ...request,
+
+        Stage:
+          "Approval",
+
+        Status:
+          "Pending Approval"
+      };
+
+
+    let id =
+      submitted.Id;
+
+
+    if (
+      id
+    ) {
+
+      await this.update(
+        submitted
+      );
+
+    } else {
+
+      id =
+        await this.create(
+          submitted
+        );
+    }
+
+
+    await this.processAttachments(
+      id,
+      files || [],
+      deletedFiles || []
+    );
+
+
+    return this.get(
+      id
+    );
+  }
+
+
+  /* =====================================================
+     ASSIGN SIGNATORY
+     ===================================================== */
+
+  public async assignSignatory(
+    requestId: number,
+    signatoryId: number
+  ):
+  Promise<void> {
+
+    this.validateRequestId(
+      requestId
+    );
+
+
+    if (
+      !signatoryId
+    ) {
+
+      throw new Error(
+        "An authorised signatory is required."
+      );
+    }
+
+
+    await this.requestList
+      .items
+      .getById(
+        requestId
+      )
+      .update({
+
+        SignatoryId:
+          signatoryId
+      });
+  }
+
+
+  /* =====================================================
+     ASSIGN ADMINISTRATOR
+     ===================================================== */
+
+  public async assignAdministrator(
+    requestId: number,
+    administratorId: number
+  ):
+  Promise<void> {
+
+    this.validateRequestId(
+      requestId
+    );
+
+
+    if (
+      !administratorId
+    ) {
+
+      throw new Error(
+        "An administrator is required."
+      );
+    }
+
+
+    await this.requestList
+      .items
+      .getById(
+        requestId
+      )
+      .update({
+
+        AdministratorId:
+          administratorId
+      });
+  }
+
+
+  /* =====================================================
+     REVIEW
      ===================================================== */
 
   public async markUnderReview(
-    id: number
-  ): Promise<void> {
+    requestId: number
+  ):
+  Promise<void> {
 
-    await this.requestList.items
-      .getById(id)
+    this.validateRequestId(
+      requestId
+    );
+
+    await this.requestList
+      .items
+      .getById(
+        requestId
+      )
       .update({
 
         Stage:
@@ -1108,17 +1766,132 @@ export class RequestService {
   }
 
 
-  /* =====================================================
-     APPROVE REQUEST
-     ===================================================== */
-
-  public async approve(
+  public async saveReview(
     request: IRequest,
-    _comments: string
-  ): Promise<void> {
+    comments: string
+  ):
+  Promise<void> {
 
     if (
       !request.Id
+    ) {
+
+      throw new Error(
+        "Request ID is required to save the review."
+      );
+    }
+
+    this.validateRequestId(
+      request.Id
+    );
+
+    const payload:
+      Record<string, unknown> = {
+
+        Stage:
+          request.Stage ||
+          "Signatory",
+
+        Status:
+          request.Status ||
+          "Under Review"
+      };
+
+    if (
+      request.SignatoryId
+    ) {
+
+      payload.SignatoryId =
+        request.SignatoryId;
+    }
+
+    if (
+      request.AdministratorId
+    ) {
+
+      payload.AdministratorId =
+        request.AdministratorId;
+    }
+
+    /*
+     * There is no dedicated review-comments field
+     * in the current IRequest / SharePoint mapping.
+     * Do not write temporary review comments into
+     * RequestRejectionDetails.
+     */
+    if (
+      comments &&
+      comments.trim()
+    ) {
+
+      console.info(
+        "Review comments supplied but no dedicated review comments field is configured."
+      );
+    }
+
+    await this.requestList
+      .items
+      .getById(
+        request.Id
+      )
+      .update(
+        payload
+      );
+  }
+
+
+  public async saveReviewForLater(
+    requestId: number,
+    signatoryId?: number
+  ):
+  Promise<void> {
+
+    this.validateRequestId(
+      requestId
+    );
+
+    const payload:
+      Record<string, unknown> = {
+
+        Stage:
+          "Signatory",
+
+        Status:
+          "Under Review"
+      };
+
+    if (
+      signatoryId
+    ) {
+
+      payload.SignatoryId =
+        signatoryId;
+    }
+
+    await this.requestList
+      .items
+      .getById(
+        requestId
+      )
+      .update(
+        payload
+      );
+  }
+
+
+  public async approve(
+    request: IRequest | number,
+    comments?: string
+  ):
+  Promise<void> {
+
+    const requestId =
+      typeof request === "number"
+        ? request
+        : request.Id;
+
+    if (
+      !requestId
     ) {
 
       throw new Error(
@@ -1126,22 +1899,14 @@ export class RequestService {
       );
     }
 
+    this.validateRequestId(
+      requestId
+    );
 
-    const itemId =
-      request.Id;
-
-
-    /*
-     * Approved requests move to the
-     * completed stage.
-     *
-     * RequestApproved is the existing
-     * SharePoint Choice column.
-     */
-
-    await this.requestList.items
+    await this.requestList
+      .items
       .getById(
-        itemId
+        requestId
       )
       .update({
 
@@ -1154,25 +1919,35 @@ export class RequestService {
         RequestApproved:
           "Yes",
 
-        /* Clear any previous rejection reason when approved. */
-
         RequestRejectionDetails:
           null
       });
+
+    if (
+      comments &&
+      comments.trim()
+    ) {
+
+      console.info(
+        "Approval comments supplied but no dedicated approval comments field is configured."
+      );
+    }
   }
 
 
-  /* =====================================================
-     REJECT REQUEST
-     ===================================================== */
-
   public async reject(
-    request: IRequest,
+    request: IRequest | number,
     comments: string
-  ): Promise<void> {
+  ):
+  Promise<void> {
+
+    const requestId =
+      typeof request === "number"
+        ? request
+        : request.Id;
 
     if (
-      !request.Id
+      !requestId
     ) {
 
       throw new Error(
@@ -1180,13 +1955,17 @@ export class RequestService {
       );
     }
 
+    this.validateRequestId(
+      requestId
+    );
 
-    const rejectionReason =
-      comments.trim();
-
+    const reason =
+      comments
+        ? comments.trim()
+        : "";
 
     if (
-      !rejectionReason
+      !reason
     ) {
 
       throw new Error(
@@ -1194,14 +1973,10 @@ export class RequestService {
       );
     }
 
-
-    const itemId =
-      request.Id;
-
-
-    await this.requestList.items
+    await this.requestList
+      .items
       .getById(
-        itemId
+        requestId
       )
       .update({
 
@@ -1215,155 +1990,122 @@ export class RequestService {
           "No",
 
         RequestRejectionDetails:
-          rejectionReason
+          reason
       });
   }
 
 
   /* =====================================================
-     SAVE REVIEW FOR LATER
-     ===================================================== */
-
-  public async saveReview(
-    request: IRequest,
-    _comments: string
-  ): Promise<void> {
-
-    if (
-      !request.Id
-    ) {
-
-      throw new Error(
-        "Request ID is required."
-      );
-    }
-
-
-    const itemId =
-      request.Id;
-
-
-    await this.requestList.items
-      .getById(
-        itemId
-      )
-      .update({
-
-        Stage:
-          "Signatory",
-
-        Status:
-          "Under Review"
-      });
-  }
-
-
-  /* =====================================================
-     ASSIGN SIGNATORY
-     ===================================================== */
-
-  public async assignSignatory(
-    requestId: number,
-    signatoryId: number
-  ): Promise<void> {
-
-    if (
-      !requestId
-    ) {
-
-      throw new Error(
-        "Request ID is required."
-      );
-    }
-
-
-    if (
-      !signatoryId
-    ) {
-
-      throw new Error(
-        "Signatory is required."
-      );
-    }
-
-
-    await this.requestList.items
-      .getById(
-        requestId
-      )
-      .update({
-
-        SignatoryId:
-          signatoryId,
-
-        Stage:
-          "Signatory",
-
-        Status:
-          "Pending Approval"
-      });
-  }
-
-
-  /* =====================================================
-     ASSIGN ADMINISTRATOR
-     ===================================================== */
-
-  public async assignAdministrator(
-    requestId: number,
-    administratorId: number
-  ): Promise<void> {
-
-    if (
-      !requestId
-    ) {
-
-      throw new Error(
-        "Request ID is required."
-      );
-    }
-
-
-    if (
-      !administratorId
-    ) {
-
-      throw new Error(
-        "Administrator is required."
-      );
-    }
-
-
-    await this.requestList.items
-      .getById(
-        requestId
-      )
-      .update({
-
-        AdministratorId:
-          administratorId
-      });
-  }
-
-
-  /* =====================================================
-     RECYCLE DRAFT
+     DELETE / RECYCLE
      ===================================================== */
 
   public async recycle(
-    id: number
-  ): Promise<void> {
+    requestId: number
+  ):
+  Promise<void> {
 
-    if (!id) {
+    this.validateRequestId(
+      requestId
+    );
+
+    await this.requestList
+      .items
+      .getById(
+        requestId
+      )
+      .recycle();
+  }
+
+
+  public async deleteRequest(
+    requestId: number
+  ):
+  Promise<void> {
+
+    this.validateRequestId(
+      requestId
+    );
+
+    await this.requestList
+      .items
+      .getById(
+        requestId
+      )
+      .delete();
+  }
+
+
+  /* =====================================================
+     HELPERS
+     ===================================================== */
+
+  private validateRequestId(
+    id: number
+  ):
+  void {
+
+    if (
+      !id ||
+      id <= 0
+    ) {
 
       throw new Error(
-        "Request ID is required."
+        "A valid request ID is required."
       );
+    }
+  }
+
+
+  private nullIfEmpty(
+    value?: string
+  ):
+  string | null {
+
+    if (
+      value === undefined ||
+      value === null
+    ) {
+
+      return null;
     }
 
 
-    await this.requestList.items
-      .getById(id)
-      .recycle();
+    const trimmed =
+      value.trim();
+
+
+    return trimmed
+      ? trimmed
+      : null;
+  }
+
+
+  private valueOrEmpty(
+    value?: string
+  ):
+  string {
+
+    return value
+      ? value.trim()
+      : "";
+  }
+
+
+  private getErrorMessage(
+    error: unknown,
+    fallback: string
+  ):
+  string {
+
+    if (
+      error instanceof Error &&
+      error.message
+    ) {
+
+      return error.message;
+    }
+
+
+    return fallback;
   }
 }

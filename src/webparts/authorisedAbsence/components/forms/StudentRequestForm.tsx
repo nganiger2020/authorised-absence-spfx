@@ -5,6 +5,8 @@ import {
   IRequest,
   IUserOption
 } from "../../models/Models";
+import { PeoplePicker } from "../../controls/PeoplePicker";
+
 
 
 interface Props {
@@ -14,6 +16,14 @@ interface Props {
   adminMode?: boolean;
 
   userOptions?: IUserOption[];
+
+  onSearchUsers: (
+    searchText: string
+  ) => Promise<IUserOption[]>;
+
+  onResolveUser: (
+    user: IUserOption
+  ) => Promise<IUserOption>;
 
   onSaveDraft: (
     r: IRequest,
@@ -28,6 +38,12 @@ interface Props {
   ) => Promise<void>;
 
   onCancel: () => void;
+
+  onAdminSave?: (
+    r: IRequest,
+    files: File[],
+    deleted: string[]
+  ) => Promise<void>;
 }
 
 
@@ -151,8 +167,16 @@ React.FC<Props> = (p) => {
 
       if (step === 1) {
 
+        if (!r.StudentId) {
+          return "Select a Student.";
+        }
+
         if (!r.Title) {
           return "Enter your Student ID.";
+        }
+
+        if (!r.DoB) {
+          return "Enter your Date of Birth.";
         }
 
         if (!r.LevelOfStudy) {
@@ -244,6 +268,24 @@ React.FC<Props> = (p) => {
             "Enter the reason for " +
             "requesting the letter."
           );
+        }
+      }
+
+      if (step === 4) {
+
+        const activeExistingEvidence =
+          (r.AttachmentFiles || []).filter(
+            attachment =>
+              deleted.indexOf(
+                attachment.FileName
+              ) === -1
+          );
+
+        if (
+          activeExistingEvidence.length +
+          files.length === 0
+        ) {
+          return "Add at least one supporting evidence file.";
         }
       }
 
@@ -407,11 +449,19 @@ React.FC<Props> = (p) => {
         setSaving(true);
         setError("");
 
-        await p.onSaveDraft(
-          r,
-          files,
-          deleted
-        );
+        if (p.adminMode && p.onAdminSave) {
+          await p.onAdminSave(
+            r,
+            files,
+            deleted
+          );
+        } else {
+          await p.onSaveDraft(
+            r,
+            files,
+            deleted
+          );
+        }
 
       } catch (err) {
 
@@ -441,10 +491,11 @@ React.FC<Props> = (p) => {
     (): FormStep | 0 => {
 
       if (
+        !r.StudentId ||
         !r.Title ||
+        !r.DoB ||
         !r.LevelOfStudy ||
-        !r.Programme ||
-        (p.adminMode && !r.StudentId)
+        !r.Programme
       ) {
         return 1;
       }
@@ -501,6 +552,22 @@ React.FC<Props> = (p) => {
           .Reasonforrequestingaletter
       ) {
         return 3;
+      }
+
+
+      const activeExistingEvidence =
+        (r.AttachmentFiles || []).filter(
+          attachment =>
+            deleted.indexOf(
+              attachment.FileName
+            ) === -1
+        );
+
+      if (
+        activeExistingEvidence.length +
+        files.length === 0
+      ) {
+        return 4;
       }
 
 
@@ -582,6 +649,17 @@ React.FC<Props> = (p) => {
   const evidenceCount =
     existingActive.length +
     files.length;
+
+
+  const selectedStudent: IUserOption | undefined =
+    r.StudentId
+      ? {
+          Id: r.StudentId,
+          Title: r.Student ? r.Student.Title || "" : "",
+          Email: r.Student ? r.Student.EMail || "" : "",
+          LoginName: r.Student ? r.Student.LoginName || "" : ""
+        }
+      : undefined;
 
 
   /* =====================================================
@@ -715,26 +793,28 @@ React.FC<Props> = (p) => {
               record and programme.
             </p>
 
-            {p.adminMode && (
-              <div className="formGroup">
-                <label htmlFor="adminStudent">
-                  Student <span className="required"> *</span>
-                  <span className="hint">Select the student this request belongs to.</span>
-                </label>
-                <select
-                  id="adminStudent"
-                  value={r.StudentId || ""}
-                  onChange={e => patch({ StudentId: Number(e.target.value) || undefined })}
-                >
-                  <option value="">Select student</option>
-                  {(p.userOptions || []).map(user => (
-                    <option key={user.Id} value={user.Id}>
-                      {user.Title}{user.Email ? " - " + user.Email : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <PeoplePicker
+              id="student"
+              label="Student"
+              required
+              value={selectedStudent}
+              disabled={false}
+              onSearch={p.onSearchUsers}
+              onResolve={p.onResolveUser}
+              onChange={(user?: IUserOption): void => {
+                patch({
+                  StudentId: user ? user.Id : undefined,
+                  Student: user
+                    ? {
+                        Id: user.Id,
+                        Title: user.Title,
+                        EMail: user.Email || "",
+                        LoginName: user.LoginName || ""
+                      }
+                    : undefined
+                });
+              }}
+            />
 
 
             <div className="formGroup">
@@ -777,6 +857,10 @@ React.FC<Props> = (p) => {
               <label htmlFor="dob">
 
                 Date of Birth
+
+                <span className="required">
+                  {" *"}
+                </span>
 
                 <span className="hint">
                   Enter your date of birth.
@@ -1317,6 +1401,10 @@ React.FC<Props> = (p) => {
 
                 Add Evidence
 
+                <span className="required">
+                  {" *"}
+                </span>
+
                 <span className="hint">
                   You can select more than
                   one file.
@@ -1543,6 +1631,23 @@ React.FC<Props> = (p) => {
               <h3>
                 Student Details
               </h3>
+
+              <p>
+                <b>Student:</b>
+                {" "}
+                {
+                  r.Student
+                    ? (
+                        (r.Student.Title || "-") +
+                        (
+                          r.Student.EMail
+                            ? " (" + r.Student.EMail + ")"
+                            : ""
+                        )
+                      )
+                    : "-"
+                }
+              </p>
 
               <p>
                 <b>Student ID:</b>

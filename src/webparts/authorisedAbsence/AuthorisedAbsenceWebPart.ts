@@ -16,7 +16,7 @@ export default class AuthorisedAbsenceWebPart extends BaseClientSideWebPart<IAut
     this.sp = spfi().using(SPFx(this.context));
   }
   public render(): void {
-    ReactDom.render(React.createElement(AuthorisedAbsenceApp, { service: new RequestService(this.sp) }), this.domElement);
+    ReactDom.render(React.createElement(AuthorisedAbsenceApp, { service: new RequestService(this.sp, this.context)}), this.domElement);
   }
   protected onDispose(): void { ReactDom.unmountComponentAtNode(this.domElement); }
 }

@@ -824,3 +824,445 @@ button {
   outline-offset: 0;
   border-color: #0b0c0c;
 }
+
+
+/* =========================================================
+   PEOPLE PICKER
+   ========================================================= */
+
+.peoplePicker {
+  position: relative;
+  width: 100%;
+  max-width: 700px;
+}
+
+
+/* INPUT + CLEAR BUTTON */
+
+.peoplePickerControl {
+  position: relative;
+  width: 100%;
+  max-width: 700px;
+}
+
+.formPage .peoplePickerControl input[type="text"] {
+  width: 100%;
+  max-width: 700px;
+  min-height: 48px;
+  margin-top: 7px;
+  padding: 10px 90px 10px 12px;
+
+  border: 2px solid #555555;
+  border-radius: 2px;
+
+  background: #ffffff;
+  color: #1f1f1f;
+
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+}
+
+.formPage .peoplePickerControl input[type="text"]:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 0;
+  border-color: #1f1f1f;
+}
+
+.formPage .peoplePickerControl input[type="text"]::placeholder {
+  color: #777777;
+  opacity: 1;
+}
+
+
+/* CLEAR */
+
+.peoplePickerClear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+
+  transform: translateY(-40%);
+
+  min-height: 32px;
+  padding: 4px 10px;
+
+  border: 0;
+  border-radius: 2px;
+
+  background: transparent;
+  color: #5b0e2d;
+
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.peoplePickerClear:hover {
+  background: #f7eef2;
+  text-decoration: underline;
+}
+
+.peoplePickerClear:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 1px;
+}
+
+
+/* =========================================================
+   SEARCH RESULTS
+   ========================================================= */
+
+.peoplePickerResults {
+  position: absolute;
+
+  left: 0;
+  right: 0;
+
+  z-index: 1000;
+
+  width: 100%;
+  max-width: 700px;
+  max-height: 300px;
+
+  margin-top: 4px;
+
+  overflow-y: auto;
+
+  border: 1px solid #b1b1b1;
+  border-top: 3px solid #8b1e41;
+  border-radius: 2px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 5px 14px rgba(0, 0, 0, 0.15);
+}
+
+
+/* SEARCH RESULT ROW */
+
+.peoplePickerOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+
+  padding: 11px 14px;
+
+  border: 0;
+  border-bottom: 1px solid #e2e2e2;
+
+  background: #ffffff;
+  color: #222222;
+
+  font-family: Arial, Helvetica, sans-serif;
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.peoplePickerOption:last-child {
+  border-bottom: 0;
+}
+
+.peoplePickerOption:hover {
+  background: #f7eef2;
+}
+
+.peoplePickerOption:focus {
+  position: relative;
+
+  outline: 3px solid #ffbf47;
+  outline-offset: -3px;
+
+  background: #f7eef2;
+}
+
+
+/* =========================================================
+   AVATAR
+   ========================================================= */
+
+.peoplePickerAvatar {
+  display: flex;
+  flex: 0 0 40px;
+
+  align-items: center;
+  justify-content: center;
+
+  width: 40px;
+  height: 40px;
+
+  border-radius: 50%;
+
+  background: #5b0e2d;
+  color: #ffffff;
+
+  font-size: 16px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   PERSON NAME + EMAIL
+   ========================================================= */
+
+.peoplePickerPerson {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+
+  min-width: 0;
+}
+
+.peoplePickerPerson strong {
+  display: block;
+
+  overflow: hidden;
+
+  color: #222222;
+
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peoplePickerPerson span {
+  display: block;
+
+  margin-top: 2px;
+
+  overflow: hidden;
+
+  color: #626262;
+
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   SEARCHING / NO USERS
+   ========================================================= */
+
+.peoplePickerEmpty {
+  padding: 15px;
+
+  background: #ffffff;
+
+  color: #626262;
+
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   SELECTED PERSON
+   ========================================================= */
+
+.peoplePickerSelected {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  width: 100%;
+  max-width: 700px;
+
+  margin-top: 8px;
+  padding: 10px 12px;
+
+  border: 1px solid #cccccc;
+  border-left: 4px solid #5b0e2d;
+  border-radius: 2px;
+
+  background: #fbf7f9;
+}
+
+.peoplePickerSelected .peoplePickerAvatar {
+  flex-basis: 36px;
+
+  width: 36px;
+  height: 36px;
+
+  font-size: 14px;
+}
+
+.peoplePickerSelected > span:last-child {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+
+  min-width: 0;
+}
+
+.peoplePickerSelected strong {
+  display: block;
+
+  color: #222222;
+
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.peoplePickerEmail {
+  display: block;
+
+  margin-top: 2px;
+
+  overflow: hidden;
+
+  color: #626262;
+
+  font-size: 13px;
+  font-weight: 400;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   PEOPLE PICKER HINT
+   ========================================================= */
+
+.peoplePicker .hint {
+  margin: 6px 0 0;
+
+  color: #626262;
+
+  font-size: 13px;
+  font-weight: 400;
+}
+
+
+/* =========================================================
+   PEOPLE PICKER ERROR
+   ========================================================= */
+
+.peoplePicker .errorMessage {
+  margin-top: 7px;
+
+  color: #b10e1e;
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media screen and (max-width: 768px) {
+
+  .peoplePicker,
+  .peoplePickerControl,
+  .peoplePickerResults,
+  .peoplePickerSelected {
+    max-width: 100%;
+  }
+
+  .formPage .peoplePickerControl input[type="text"] {
+    max-width: 100%;
+    min-height: 46px;
+    padding-right: 82px;
+  }
+
+  .peoplePickerResults {
+    max-height: 250px;
+  }
+
+  .peoplePickerOption {
+    padding: 10px;
+  }
+
+  .peoplePickerAvatar {
+    flex: 0 0 36px;
+
+    width: 36px;
+    height: 36px;
+
+    font-size: 14px;
+  }
+}
+
+
+/* Textbox and dropdown - same width */
+.formGroup input[type="text"],
+.formGroup input[type="date"],
+.formGroup input[type="email"],
+.formGroup input[type="number"],
+.formGroup textarea,
+.formGroup select {
+  width: 100%;
+  max-width: 700px;
+  box-sizing: border-box;
+}
+
+/* =====================================================
+   SIGNED IN USER BANNER
+   ===================================================== */
+
+.signedInBanner {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 24px 0;
+  padding: 14px 18px;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  background: #f3f2f1;
+  border-left: 5px solid #5b0e2d;
+
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.signedInBannerText {
+  display: inline-block;
+}
+
+.signedInBannerText strong {
+  font-weight: 700;
+}
+
+.signedInBannerSeparator {
+  font-weight: 700;
+}
+
+.signedInBannerRole {
+  display: inline-block;
+  padding: 3px 10px;
+
+  background: #5b0e2d;
+  color: #ffffff;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  border-radius: 3px;
+}
+
+@media (max-width: 600px) {
+  .signedInBanner {
+    padding: 12px 14px;
+  }
+}
