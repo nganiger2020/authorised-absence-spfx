@@ -21,6 +21,9 @@ interface Props {
   adminOptions?: IAdminTermOption[];
   adminOptionsLoading?: boolean;
 
+  /** All choices configured on SharePoint AbsenceReasonsConfirm field. */
+  absenceReasonOptions: string[];
+
   onSearchUsers: (
     searchText: string
   ) => Promise<IUserOption[]>;
@@ -35,11 +38,10 @@ interface Props {
   ) => Promise<void>;
 
   onSaveForLater: (
-    comments: string
-  ) => Promise<void>;
-
-  onAssignSignatory?: (
-    userId: number
+    comments: string,
+    absenceReasonsConfirm: string[],
+    reasonConfOtherComments: string,
+    signatoryId?: number
   ) => Promise<void>;
 
   onAssignAdministrator?: (
@@ -49,11 +51,17 @@ interface Props {
   onBack: () => void;
 
   onApprove: (
-    comments: string
+    comments: string,
+    absenceReasonsConfirm: string[],
+    reasonConfOtherComments: string,
+    signatoryId?: number
   ) => Promise<void>;
 
   onReject: (
-    comments: string
+    comments: string,
+    absenceReasonsConfirm: string[],
+    reasonConfOtherComments: string,
+    signatoryId?: number
   ) => Promise<void>;
 }
 
@@ -73,7 +81,15 @@ React.FC<Props> = (props) => {
 
   const [confirmedAbsenceReasons, setConfirmedAbsenceReasons] =
     React.useState<string[]>(
-      props.request.AbsenceReasons || []
+      props.request.AbsenceReasonsConfirm &&
+      props.request.AbsenceReasonsConfirm.length > 0
+        ? props.request.AbsenceReasonsConfirm.slice()
+        : (props.request.AbsenceReasons || []).slice()
+    );
+
+  const [reasonConfOtherComments, setReasonConfOtherComments] =
+    React.useState<string>(
+      props.request.ReasonConfOtherComments || ""
     );
 
   const [error, setError] =
@@ -140,6 +156,27 @@ React.FC<Props> = (props) => {
   };
 
 
+  const displayStatus = (
+    value?: string
+  ): string => {
+
+    const status =
+      (value || "")
+        .trim()
+        .toLowerCase();
+
+    if (
+      status === "submitted" ||
+      status === "pending approval" ||
+      status === "under review"
+    ) {
+      return "Under Review";
+    }
+
+    return value || "Under Review";
+  };
+
+
   /* =====================================================
      ERROR MESSAGE
      ===================================================== */
@@ -170,7 +207,12 @@ React.FC<Props> = (props) => {
         setError("");
 
         await props.onApprove(
-          comments.trim()
+          comments.trim(),
+          confirmedAbsenceReasons.slice(),
+          confirmedAbsenceReasons.indexOf("Other") >= 0
+            ? reasonConfOtherComments.trim()
+            : "",
+          selectedSignatory ? selectedSignatory.Id : undefined
         );
 
       } catch (err) {
@@ -227,7 +269,12 @@ React.FC<Props> = (props) => {
         setError("");
 
         await props.onReject(
-          comments.trim()
+          comments.trim(),
+          confirmedAbsenceReasons.slice(),
+          confirmedAbsenceReasons.indexOf("Other") >= 0
+            ? reasonConfOtherComments.trim()
+            : "",
+          selectedSignatory ? selectedSignatory.Id : undefined
         );
 
       } catch (err) {
@@ -268,8 +315,28 @@ React.FC<Props> = (props) => {
         setSaving(true);
         setError("");
 
+        if (confirmedAbsenceReasons.length === 0) {
+          throw new Error("Select at least one Reason for Absence.");
+        }
+
+        if (
+          confirmedAbsenceReasons.indexOf("Other") >= 0 &&
+          !reasonConfOtherComments.trim()
+        ) {
+          throw new Error("Enter details for the Other reason.");
+        }
+
+        if (!selectedSignatory) {
+          throw new Error("Select an Assigned Signatory.");
+        }
+
         await props.onSaveForLater(
-          comments.trim()
+          comments.trim(),
+          confirmedAbsenceReasons.slice(),
+          confirmedAbsenceReasons.indexOf("Other") >= 0
+            ? reasonConfOtherComments.trim()
+            : "",
+          selectedSignatory.Id
         );
 
       } catch (err) {
@@ -283,56 +350,6 @@ React.FC<Props> = (props) => {
           getErrorMessage(
             err,
             "Unable to save review."
-          )
-        );
-
-        window.scrollTo(
-          0,
-          0
-        );
-
-      } finally {
-
-        setSaving(false);
-      }
-    };
-
-
-  /* =====================================================
-     ASSIGN SIGNATORY
-     ===================================================== */
-
-  const assignSignatory =
-    async (): Promise<void> => {
-
-      if (
-        !props.onAssignSignatory ||
-        !selectedSignatory
-      ) {
-        return;
-      }
-
-
-      try {
-
-        setSaving(true);
-        setError("");
-
-        await props.onAssignSignatory(
-          selectedSignatory.Id
-        );
-
-      } catch (err) {
-
-        console.error(
-          "Unable to assign signatory.",
-          err
-        );
-
-        setError(
-          getErrorMessage(
-            err,
-            "Unable to assign signatory."
           )
         );
 
@@ -370,60 +387,55 @@ React.FC<Props> = (props) => {
       }
 
 
-      const absenceReasons =
-        props.request.AbsenceReasons || [];
-
-      const allReasonsConfirmed =
-        absenceReasons.every(
-          reason =>
-            confirmedAbsenceReasons.indexOf(reason) >= 0
-        );
-
-      if (
-        absenceReasons.length > 0 &&
-        !allReasonsConfirmed
-      ) {
+      if (confirmedAbsenceReasons.length === 0) {
 
         setError(
-          "Reconfirm all Reason(s) for Absence before submitting the decision."
+          "Select at least one Reason for Absence."
         );
 
-        window.scrollTo(
-          0,
-          0
-        );
-
+        window.scrollTo(0, 0);
         return;
       }
 
+      if (
+        confirmedAbsenceReasons.indexOf("Other") >= 0 &&
+        !reasonConfOtherComments.trim()
+      ) {
+
+        setError(
+          "Enter details for the Other reason."
+        );
+
+        window.scrollTo(0, 0);
+        return;
+      }
+
+      if (!selectedSignatory) {
+
+        setError(
+          "Select an Assigned Signatory."
+        );
+
+        window.scrollTo(0, 0);
+        return;
+      }
 
       try {
 
         setSaving(true);
         setError("");
 
-        /*
-         * Save the selected Assigned Signatory as part of
-         * Submit Decision. There is intentionally no separate
-         * Save Signatory button.
-         */
-        if (
-          props.onAssignSignatory &&
-          selectedSignatory &&
-          selectedSignatory.Id !== props.request.SignatoryId
-        ) {
-          await props.onAssignSignatory(
-            selectedSignatory.Id
-          );
-        }
-
-
         if (
           decision === "Approve"
         ) {
 
           await props.onApprove(
-            comments.trim()
+            comments.trim(),
+            confirmedAbsenceReasons.slice(),
+            confirmedAbsenceReasons.indexOf("Other") >= 0
+              ? reasonConfOtherComments.trim()
+              : "",
+            selectedSignatory.Id
           );
 
           return;
@@ -446,7 +458,12 @@ React.FC<Props> = (props) => {
 
 
         await props.onReject(
-          comments.trim()
+          comments.trim(),
+          confirmedAbsenceReasons.slice(),
+          confirmedAbsenceReasons.indexOf("Other") >= 0
+            ? reasonConfOtherComments.trim()
+            : "",
+          selectedSignatory ? selectedSignatory.Id : undefined
         );
 
       } catch (err) {
@@ -492,6 +509,19 @@ React.FC<Props> = (props) => {
   return (
 
     <div className="review">
+      <style>{`
+        .reasonOptionsGrid { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+        .reasonOption { display:flex; align-items:center; gap:10px; padding:0; border:0; background:transparent; cursor:pointer; }
+        .reasonOptionStudent { border:0; background:transparent; }
+        .reasonOption input { width:20px; height:20px; margin:0; flex:0 0 auto; }
+        .reasonOptionText { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-weight:400; }
+        .studentSelectedBadge { display:inline-block; padding:2px 7px; border-radius:10px; background:#e8f1f8; color:#1d70b8; font-size:12px; font-weight:700; }
+        .reasonHelp { margin:0 0 10px; }
+        .otherReasonReview { margin-top:20px; max-width:760px; }
+        .otherReasonReview textarea { width:100%; box-sizing:border-box; border:2px solid #0b0c0c; padding:10px; font:inherit; }
+        .warningMessage { border-left:5px solid #d4351c; padding:12px 15px; background:#f3f2f1; }
+      `}</style>
+
 
       {/* ===============================================
           HEADER
@@ -520,8 +550,9 @@ React.FC<Props> = (props) => {
           <span className="pill statusReview">
 
             {
-              props.request.Status ||
-              "Under Review"
+              displayStatus(
+                props.request.Status
+              )
             }
 
           </span>
@@ -585,7 +616,7 @@ React.FC<Props> = (props) => {
           <div className="reviewValue">
 
             {
-              displayValue(
+              displayStatus(
                 props.request.Status
               )
             }
@@ -721,7 +752,77 @@ React.FC<Props> = (props) => {
 
         </div>
 
+        <div className="reviewRow">
+          <div className="reviewKey">
+            Administrator
+          </div>
+          <div className="reviewValue">
+            {props.request.AdminLabel || adminLabel || "-"}
+          </div>
+        </div>
+
       </div>
+
+
+      {/* ===============================================
+          VISA / IMMIGRATION DETAILS
+         =============================================== */}
+
+      {
+        (props.request.VisaType ||
+          props.request.VisaOtherComments ||
+          props.request.VisaStartDate ||
+          props.request.VisaEndDate ||
+          props.request.VisaAttachment ||
+          props.request.PassportAttachment) &&
+        (
+          <div className="reviewSection">
+            <h2>Visa / Immigration Details</h2>
+
+            {props.request.VisaType && (
+              <div className="reviewRow">
+                <div className="reviewKey">Visa Type</div>
+                <div className="reviewValue">{props.request.VisaType}</div>
+              </div>
+            )}
+
+            {props.request.VisaOtherComments && (
+              <div className="reviewRow">
+                <div className="reviewKey">Visa Other Details</div>
+                <div className="reviewValue">{props.request.VisaOtherComments}</div>
+              </div>
+            )}
+
+            {props.request.VisaStartDate && (
+              <div className="reviewRow">
+                <div className="reviewKey">Visa Start Date</div>
+                <div className="reviewValue">{displayDate(props.request.VisaStartDate)}</div>
+              </div>
+            )}
+
+            {props.request.VisaEndDate && (
+              <div className="reviewRow">
+                <div className="reviewKey">Visa End Date</div>
+                <div className="reviewValue">{displayDate(props.request.VisaEndDate)}</div>
+              </div>
+            )}
+
+            {props.request.VisaAttachment && (
+              <div className="reviewRow">
+                <div className="reviewKey">Visa Evidence</div>
+                <div className="reviewValue">{props.request.VisaAttachment}</div>
+              </div>
+            )}
+
+            {props.request.PassportAttachment && (
+              <div className="reviewRow">
+                <div className="reviewKey">Passport Evidence</div>
+                <div className="reviewValue">{props.request.PassportAttachment}</div>
+              </div>
+            )}
+          </div>
+        )
+      }
 
 
       {/* ===============================================
@@ -773,102 +874,153 @@ React.FC<Props> = (props) => {
         </div>
 
 
-        <div className="reviewRow">
+        <div className="reviewRow reasonReviewRow">
 
           <div className="reviewKey">
             Reason(s) for Absence
+            <span className="required">{" *"}</span>
           </div>
 
           <div className="reviewValue">
 
-            {
-              (
-                props.request.AbsenceReasons ||
-                []
-              ).length > 0
-                ? (
-                    <fieldset className="approverReasonChecklist">
+            <fieldset className="formGroup">
 
-                      <legend className="hint">
-                        Reconfirm the reason(s) before submitting your decision.
-                      </legend>
+              <legend>
+                Reason for absence
+                <span className="required">
+                  {" *"}
+                </span>
+              </legend>
 
-                      {
-                        (
-                          props.request.AbsenceReasons ||
-                          []
-                        ).map(reason => (
+              <p className="hint">
+                Select all that apply.
+              </p>
+
+              {
+                props.absenceReasonOptions &&
+                props.absenceReasonOptions.length > 0
+                  ? (
+                      props.absenceReasonOptions.map(
+                        (reason: string) => (
 
                           <label
                             className="check"
                             key={reason}
                           >
+
                             <input
                               type="checkbox"
                               checked={
-                                confirmedAbsenceReasons.indexOf(reason) >= 0
+                                confirmedAbsenceReasons.indexOf(
+                                  reason
+                                ) !== -1
                               }
                               disabled={saving}
-                              onChange={(event): void => {
+                              onChange={(): void => {
 
-                                if (event.target.checked) {
+                                setConfirmedAbsenceReasons(
+                                  current => {
 
-                                  setConfirmedAbsenceReasons(
-                                    previous =>
-                                      previous.indexOf(reason) >= 0
-                                        ? previous
-                                        : previous.concat(reason)
-                                  );
+                                    const updated =
+                                      current.slice();
 
-                                } else {
+                                    const index =
+                                      updated.indexOf(
+                                        reason
+                                      );
 
-                                  setConfirmedAbsenceReasons(
-                                    previous =>
-                                      previous.filter(
-                                        item => item !== reason
-                                      )
-                                  );
-                                }
+                                    if (index === -1) {
+
+                                      updated.push(
+                                        reason
+                                      );
+
+                                    } else {
+
+                                      updated.splice(
+                                        index,
+                                        1
+                                      );
+
+                                      if (reason === "Other") {
+                                        setReasonConfOtherComments(
+                                          ""
+                                        );
+                                      }
+                                    }
+
+                                    return updated;
+                                  }
+                                );
 
                                 setError("");
                               }}
                             />
 
-                            <span>{reason}</span>
+                            <span>
+                              {reason}
+                            </span>
 
                           </label>
-                        ))
-                      }
+                        )
+                      )
+                    )
+                  : (
+                      <div className="warningMessage">
+                        No choices are configured on the AbsenceReasonsConfirm SharePoint field.
+                      </div>
+                    )
+              }
 
-                    </fieldset>
-                  )
-                : "-"
+            </fieldset>
+
+            {
+              confirmedAbsenceReasons.indexOf(
+                "Other"
+              ) !== -1 &&
+              (
+                <div className="formGroup">
+
+                  <label htmlFor="reasonConfOtherComments">
+                    Other reason
+                    <span className="required">
+                      {" *"}
+                    </span>
+                  </label>
+
+                  <textarea
+                    id="reasonConfOtherComments"
+                    rows={4}
+                    value={
+                      reasonConfOtherComments
+                    }
+                    disabled={saving}
+                    onChange={(event): void => {
+                      setReasonConfOtherComments(
+                        event.target.value
+                      );
+                      setError("");
+                    }}
+                  />
+
+                </div>
+              )
             }
 
           </div>
 
         </div>
 
-
         {
-          props.request
-            .ReasonOtherComments &&
+          props.request.ReasonOtherComments &&
           (
             <div className="reviewRow">
-
               <div className="reviewKey">
-                Additional Details
+                Student Other Reason Details
               </div>
-
               <div className="reviewValue">
-
-                {
-                  props.request
-                    .ReasonOtherComments
-                }
-
+                {props.request.ReasonOtherComments}
               </div>
-
             </div>
           )
         }
@@ -1266,43 +1418,7 @@ React.FC<Props> = (props) => {
             />
 
 
-            <div className="formGroup">
-              <fieldset>
-                <legend>
-                  Reason(s) for Absence
-                  <span className="required">
-                    {" *"}
-                  </span>
-                </legend>
-
-                {
-                  (
-                    props.request.AbsenceReasons ||
-                    []
-                  ).length > 0
-                    ? (
-                        props.request.AbsenceReasons ||
-                        []
-                      ).map(reason => (
-                        <label
-                          className="check"
-                          key={reason}
-                        >
-                          <input
-                            type="checkbox"
-                            checked
-                            disabled
-                            readOnly
-                          />
-                          <span>{reason}</span>
-                        </label>
-                      ))
-                    : (
-                        <span>-</span>
-                      )
-                }
-              </fieldset>
-            </div>
+            
 
           </div>
         )

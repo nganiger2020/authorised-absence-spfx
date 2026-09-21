@@ -57,13 +57,26 @@ const getStatusClass = (status?: string): string => {
     case "rejected":
       return "pill statusRejected";
     case "under review":
-      return "pill statusReview";
     case "submitted":
     case "pending approval":
-      return "pill statusPending";
+      return "pill statusReview";
     default:
       return "pill statusDraft";
   }
+};
+
+const displayStatus = (status?: string): string => {
+  const value = normalize(status);
+
+  if (
+    value === "submitted" ||
+    value === "pending approval" ||
+    value === "under review"
+  ) {
+    return "Under Review";
+  }
+
+  return status || "Draft";
 };
 
 export const Dashboard: React.FC<Props> = (props) => {
@@ -197,7 +210,6 @@ export const Dashboard: React.FC<Props> = (props) => {
     const result = {
       All: props.items.length,
       Draft: 0,
-      "Pending Approval": 0,
       "Under Review": 0,
       Approved: 0,
       Rejected: 0
@@ -208,9 +220,11 @@ export const Dashboard: React.FC<Props> = (props) => {
 
       if (status === "draft") {
         result.Draft++;
-      } else if (status === "submitted" || status === "pending approval") {
-        result["Pending Approval"]++;
-      } else if (status === "under review") {
+      } else if (
+        status === "submitted" ||
+        status === "pending approval" ||
+        status === "under review"
+      ) {
         result["Under Review"]++;
       } else if (status === "approved") {
         result.Approved++;
@@ -232,10 +246,11 @@ export const Dashboard: React.FC<Props> = (props) => {
 
       if (statusFilter === "Draft") {
         statusMatches = status === "draft";
-      } else if (statusFilter === "Pending Approval") {
-        statusMatches = status === "submitted" || status === "pending approval";
       } else if (statusFilter === "Under Review") {
-        statusMatches = status === "under review";
+        statusMatches =
+          status === "submitted" ||
+          status === "pending approval" ||
+          status === "under review";
       } else if (statusFilter !== "All") {
         statusMatches = status === normalize(statusFilter);
       }
@@ -337,7 +352,6 @@ export const Dashboard: React.FC<Props> = (props) => {
   const cards: Array<{ label: string; count: number }> = [
     { label: "All", count: counts.All },
     { label: "Draft", count: counts.Draft },
-    { label: "Pending Approval", count: counts["Pending Approval"] },
     { label: "Under Review", count: counts["Under Review"] },
     { label: "Approved", count: counts.Approved },
     { label: "Rejected", count: counts.Rejected }
@@ -528,7 +542,7 @@ export const Dashboard: React.FC<Props> = (props) => {
                       <td>{(request.AbsenceReasons || []).join(", ") || "-"}</td>
                       <td>
                         <span className={getStatusClass(request.Status)}>
-                          {request.Status || "Draft"}
+                          {displayStatus(request.Status)}
                         </span>
                       </td>
                       <td style={{display:"none"}}>
@@ -592,7 +606,7 @@ export const Dashboard: React.FC<Props> = (props) => {
                                       </svg>
                                     </span>
                                     <span className="requestActionsLabel">
-                                      {normalize(request.Status) === "under review"
+                                      {isReviewableStatus(request.Status)
                                         ? "Continue Review"
                                         : "Review"}
                                     </span>

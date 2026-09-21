@@ -1,29 +1,33 @@
 import * as React from "react";
 
 import {
-  FormStep,
   IRequest,
-  IUserOption
+  IUserOption,
+  IValidationError,
+  emptyRequest,
+  toSharePointUser,
+  toUserOption
 } from "../../models/Models";
 import { PeoplePicker } from "../../controls/PeoplePicker";
-import {
-  AdminManagedMetadata,
-  IAdminTermOption
-} from "../../controls/AdminManagedMetadata";
+import { IAdminTermOption } from "../../controls/AdminManagedMetadata";
 
 
 
 interface Props {
-
   initial: IRequest;
 
   adminMode?: boolean;
 
+  // Existing SharePoint users
   userOptions?: IUserOption[];
 
-  adminOptions: IAdminTermOption[];
+  // Administrator taxonomy options
+  adminOptions?: IAdminTermOption[];
 
   adminOptionsLoading?: boolean;
+
+  // Dynamic SharePoint AbsenceReasons choices
+  absenceReasonOptions: string[];
 
   onSearchUsers: (
     searchText: string
@@ -34,582 +38,859 @@ interface Props {
   ) => Promise<IUserOption>;
 
   onSaveDraft: (
-    r: IRequest,
+    request: IRequest,
     files: File[],
-    deleted: string[]
+    deletedFiles: string[]
+  ) => Promise<void>;
+
+  /** Used when an Admin edits an existing workflow item. */
+  onAdminSave?: (
+    request: IRequest,
+    files: File[],
+    deletedFiles: string[]
   ) => Promise<void>;
 
   onSubmit: (
-    r: IRequest,
+    request: IRequest,
     files: File[],
-    deleted: string[]
+    deletedFiles: string[]
   ) => Promise<void>;
 
   onCancel: () => void;
-
-  onAdminSave?: (
-    r: IRequest,
-    files: File[],
-    deleted: string[]
-  ) => Promise<void>;
 }
 
 
-const reasons: string[] = [
-  "Conference",
-  "Dissertation – writing up in home country",
-  "Extending visa",
-  "Family illness/bereavement",
-  "Fieldwork",
-  "Holiday: PG research students only",
-  "Medical",
-  "Thesis – writing up in home country",
-  "Other"
-];
+const createSafeRequest =
+  (
+    sourceRequest?: IRequest
+  ):
+  IRequest => {
+
+    const source =
+      sourceRequest ||
+      emptyRequest();
 
 
-const stepLabels: string[] = [
-  "Student Details",
-  "Absence Details",
-  "Travel / Letter",
-  "Evidence",
-  "Review & Submit"
-];
+    return {
 
+      ...emptyRequest(),
 
-export const StudentRequestForm:
-React.FC<Props> = (p) => {
+      ...source,
 
-  const [r, setR] =
-    React.useState<IRequest>({
-      ...p.initial
-    });
+      Title:
+        source.Title || "",
 
-  const [step, setStep] =
-    React.useState<FormStep>(1);
+      Stage:
+        source.Stage || "Student",
 
-  const [files, setFiles] =
-    React.useState<File[]>([]);
+      Status:
+        source.Status || "Draft",
 
-  const [deleted, setDeleted] =
-    React.useState<string[]>([]);
+      AbsenceReasons:
+        source.AbsenceReasons
+          ? source.AbsenceReasons.slice()
+          : [],
 
-  const [error, setError] =
-    React.useState<string>("");
+      AbsenceReasonsConfirm:
+        source.AbsenceReasonsConfirm
+          ? source.AbsenceReasonsConfirm.slice()
+          : [],
 
-  const [saving, setSaving] =
-    React.useState<boolean>(false);
+      MonitoringConditions:
+        source.MonitoringConditions
+          ? source.MonitoringConditions.slice()
+          : [],
 
-
-  /* =====================================================
-     UPDATE
-  ===================================================== */
-
-  const patch = (
-    values: Partial<IRequest>
-  ): void => {
-
-    setR(
-      current => ({
-        ...current,
-        ...values
-      })
-    );
+      AttachmentFiles:
+        source.AttachmentFiles
+          ? source.AttachmentFiles.slice()
+          : []
+    };
   };
 
 
-  /* =====================================================
-     REASONS
-  ===================================================== */
+const StudentRequestForm:
+React.FC<Props> = (
+  props
+) => {
 
-  const hasReason = (
-    reason: string
-  ): boolean => {
-
-    return (
-      (r.AbsenceReasons || [])
-        .indexOf(reason) !== -1
+  const [
+    request,
+    setRequest
+  ] =
+    React.useState<IRequest>(
+      () =>
+        createSafeRequest(
+          props.initial
+        )
     );
-  };
 
 
-  const toggleReason = (
-    reason: string
-  ): void => {
+  const [
+    step,
+    setStep
+  ] =
+    React.useState<number>(
+      1
+    );
 
-    const currentReasons =
-      r.AbsenceReasons || [];
 
-    if (
-      currentReasons.indexOf(
-        reason
-      ) !== -1
-    ) {
+  const [
+    files,
+    setFiles
+  ] =
+    React.useState<File[]>(
+      []
+    );
 
-      patch({
-        AbsenceReasons:
-          currentReasons.filter(
-            value =>
-              value !== reason
+
+  const [
+    deletedFiles,
+    setDeletedFiles
+  ] =
+    React.useState<string[]>(
+      []
+    );
+
+
+  const [
+    errors,
+    setErrors
+  ] =
+    React.useState<IValidationError[]>(
+      []
+    );
+
+
+  const [
+    saving,
+    setSaving
+  ] =
+    React.useState<boolean>(
+      false
+    );
+
+
+  const [
+    pageError,
+    setPageError
+  ] =
+    React.useState<string>(
+      ""
+    );
+
+
+  React.useEffect(
+    () => {
+
+      setRequest(
+        createSafeRequest(
+          props.initial
+        )
+      );
+
+
+      setFiles([]);
+
+
+      setDeletedFiles([]);
+
+
+      setErrors([]);
+
+
+      setPageError("");
+
+
+      setStep(
+        1
+      );
+
+    },
+    [
+      props.initial
+    ]
+  );
+
+
+  const update =
+    (
+      patch: Partial<IRequest>
+    ):
+    void => {
+
+      setRequest(
+        current => ({
+
+          ...current,
+
+          ...patch
+        })
+      );
+    };
+
+
+  const getFieldError =
+    (
+      field: string
+    ):
+    string | undefined => {
+
+      for (
+        let i = 0;
+        i < errors.length;
+        i++
+      ) {
+
+        if (
+          errors[i].field === field
+        ) {
+
+          return errors[i].message;
+        }
+      }
+
+
+      return undefined;
+    };
+
+
+  const clearFieldError =
+    (
+      field: string
+    ):
+    void => {
+
+      setErrors(
+        current =>
+          current.filter(
+            error =>
+              error.field !== field
           )
-      });
+      );
+    };
 
-    } else {
 
-      patch({
-        AbsenceReasons: [
-          ...currentReasons,
-          reason
-        ]
+  const addError =
+    (
+      target: IValidationError[],
+      field: string,
+      message: string
+    ):
+    void => {
+
+      target.push({
+
+        field:
+          field,
+
+        message:
+          message
       });
-    }
-  };
+    };
+
+
+  const selectedStudent:
+    IUserOption | undefined =
+      toUserOption(
+        request.Student
+      );
 
 
   /* =====================================================
      VALIDATION
-  ===================================================== */
+     ===================================================== */
 
-  const validateStep =
-    (): string => {
+  const validateStep1 =
+    ():
+    boolean => {
 
-      if (step === 1) {
+      const validation:
+        IValidationError[] = [];
 
-        if (!r.StudentId) {
-          return "Select a Student.";
-        }
 
-        if (!r.Title) {
-          return "Enter your Student ID.";
-        }
+      if (
+        !request.StudentId
+      ) {
 
-        if (!r.DoB) {
-          return "Enter your Date of Birth.";
-        }
-
-        if (!r.LevelOfStudy) {
-          return "Select your Level of Study.";
-        }
-
-        if (!r.Programme) {
-          return "Enter your Programme of Study.";
-        }
-
-        if (
-          !r.AdminTermGuid ||
-          !r.AdminLabel
-        ) {
-          return "Select an Admin.";
-        }
+        addError(
+          validation,
+          "Student",
+          "Select a student."
+        );
       }
 
 
-      if (step === 2) {
+      if (
+        !request.Title ||
+        !request.Title.trim()
+      ) {
 
-        if (!r.AbsenceStartDate) {
-          return "Enter the absence start date.";
-        }
-
-        if (!r.AbsenceEndDate) {
-          return "Enter the absence end date.";
-        }
-
-        if (
-          r.AbsenceStartDate >
-          r.AbsenceEndDate
-        ) {
-          return (
-            "End date must be on or " +
-            "after the start date."
-          );
-        }
-
-        if (
-          (r.AbsenceReasons || [])
-            .length === 0
-        ) {
-          return (
-            "Select at least one reason " +
-            "for your absence."
-          );
-        }
-
-        if (
-          hasReason("Other") &&
-          !r.ReasonOtherComments
-        ) {
-          return (
-            "Enter details for the " +
-            "Other absence reason."
-          );
-        }
+        addError(
+          validation,
+          "Title",
+          "Enter the Student ID."
+        );
       }
 
 
-      if (step === 3) {
+      if (
+        !request.DoB
+      ) {
 
-        if (!r.TravelOutside) {
-          return (
-            "Select whether you will " +
-            "travel outside the UK."
-          );
-        }
+        addError(
+          validation,
+          "DoB",
+          "Enter the student's date of birth."
+        );
+      }
 
-        if (
-          r.TravelOutside === "Yes" &&
-          !r.TravelOutsideDetails
-        ) {
-          return "Enter your travel details.";
-        }
 
-        if (
-          !r
-            .letterofconfirmationforauthorise
-        ) {
-          return (
-            "Select whether you need " +
-            "an approval letter."
-          );
-        }
+      if (
+        !request.LevelOfStudy
+      ) {
 
-        if (
-          r
-            .letterofconfirmationforauthorise ===
-            "Yes" &&
-          !r
+        addError(
+          validation,
+          "LevelOfStudy",
+          "Select the level of study."
+        );
+      }
+
+
+      if (
+        !request.Programme ||
+        !request.Programme.trim()
+      ) {
+
+        addError(
+          validation,
+          "Programme",
+          "Enter the programme."
+        );
+      }
+
+
+      setErrors(
+        validation
+      );
+
+
+      return (
+        validation.length === 0
+      );
+    };
+
+
+  const validateStep2 =
+    ():
+    boolean => {
+
+      const validation:
+        IValidationError[] = [];
+
+
+      if (
+        !request.AbsenceStartDate
+      ) {
+
+        addError(
+          validation,
+          "AbsenceStartDate",
+          "Enter the absence start date."
+        );
+      }
+
+
+      if (
+        !request.AbsenceEndDate
+      ) {
+
+        addError(
+          validation,
+          "AbsenceEndDate",
+          "Enter the absence end date."
+        );
+      }
+
+
+      if (
+        request.AbsenceStartDate &&
+        request.AbsenceEndDate &&
+        request.AbsenceEndDate <
+          request.AbsenceStartDate
+      ) {
+
+        addError(
+          validation,
+          "AbsenceEndDate",
+          "The absence end date cannot be before the start date."
+        );
+      }
+
+
+      if (
+        !request.AbsenceReasons ||
+        request.AbsenceReasons.length === 0
+      ) {
+
+        addError(
+          validation,
+          "AbsenceReasons",
+          "Select at least one reason for absence."
+        );
+      }
+
+
+      setErrors(
+        validation
+      );
+
+
+      return (
+        validation.length === 0
+      );
+    };
+
+
+  const validateStep3 =
+    ():
+    boolean => {
+
+      const validation:
+        IValidationError[] = [];
+
+
+      if (
+        !request.TravelOutside
+      ) {
+
+        addError(
+          validation,
+          "TravelOutside",
+          "Select whether you will travel outside the UK."
+        );
+      }
+
+
+      if (
+        request.TravelOutside === "Yes" &&
+        (
+          !request.TravelOutsideDetails ||
+          !request.TravelOutsideDetails.trim()
+        )
+      ) {
+
+        addError(
+          validation,
+          "TravelOutsideDetails",
+          "Enter details about travel outside the UK."
+        );
+      }
+
+
+      if (
+        !request
+          .letterofconfirmationforauthorise
+      ) {
+
+        addError(
+          validation,
+          "letterofconfirmationforauthorise",
+          "Select whether you require a letter of confirmation."
+        );
+      }
+
+
+      if (
+        request
+          .letterofconfirmationforauthorise ===
+          "Yes" &&
+        (
+          !request
+            .Reasonforrequestingaletter ||
+          !request
             .Reasonforrequestingaletter
-        ) {
-          return (
-            "Enter the reason for " +
-            "requesting the letter."
-          );
-        }
+            .trim()
+        )
+      ) {
+
+        addError(
+          validation,
+          "Reasonforrequestingaletter",
+          "Enter the reason for requesting a letter."
+        );
       }
 
-      if (step === 4) {
 
-        const activeExistingEvidence =
-          (r.AttachmentFiles || []).filter(
-            attachment =>
-              deleted.indexOf(
-                attachment.FileName
-              ) === -1
-          );
+      setErrors(
+        validation
+      );
+
+
+      return (
+        validation.length === 0
+      );
+    };
+
+
+  const validateCurrentStep =
+    ():
+    boolean => {
+
+      if (
+        step === 1
+      ) {
+
+        return validateStep1();
+      }
+
+
+      if (
+        step === 2
+      ) {
+
+        return validateStep2();
+      }
+
+
+      if (
+        step === 3
+      ) {
+
+        return validateStep3();
+      }
+
+
+      setErrors([]);
+
+
+      return true;
+    };
+
+
+  const validateAll =
+    ():
+    boolean => {
+
+      const validation:
+        IValidationError[] = [];
+
+
+      if (
+        !request.StudentId
+      ) {
+
+        addError(
+          validation,
+          "Student",
+          "Select a student."
+        );
+      }
+
+
+      if (
+        !request.Title ||
+        !request.Title.trim()
+      ) {
+
+        addError(
+          validation,
+          "Title",
+          "Enter the Student ID."
+        );
+      }
+
+
+      if (
+        !request.DoB
+      ) {
+
+        addError(
+          validation,
+          "DoB",
+          "Enter the student's date of birth."
+        );
+      }
+
+
+      if (
+        !request.LevelOfStudy
+      ) {
+
+        addError(
+          validation,
+          "LevelOfStudy",
+          "Select the level of study."
+        );
+      }
+
+
+      if (
+        !request.Programme ||
+        !request.Programme.trim()
+      ) {
+
+        addError(
+          validation,
+          "Programme",
+          "Enter the programme."
+        );
+      }
+
+
+      if (
+        !request.AbsenceStartDate
+      ) {
+
+        addError(
+          validation,
+          "AbsenceStartDate",
+          "Enter the absence start date."
+        );
+      }
+
+
+      if (
+        !request.AbsenceEndDate
+      ) {
+
+        addError(
+          validation,
+          "AbsenceEndDate",
+          "Enter the absence end date."
+        );
+      }
+
+
+      if (
+        request.AbsenceStartDate &&
+        request.AbsenceEndDate &&
+        request.AbsenceEndDate <
+          request.AbsenceStartDate
+      ) {
+
+        addError(
+          validation,
+          "AbsenceEndDate",
+          "The absence end date cannot be before the start date."
+        );
+      }
+
+
+      if (
+        !request.AbsenceReasons ||
+        request.AbsenceReasons.length === 0
+      ) {
+
+        addError(
+          validation,
+          "AbsenceReasons",
+          "Select at least one reason for absence."
+        );
+      }
+
+
+      if (
+        !request.TravelOutside
+      ) {
+
+        addError(
+          validation,
+          "TravelOutside",
+          "Select whether you will travel outside the UK."
+        );
+      }
+
+
+      if (
+        request.TravelOutside === "Yes" &&
+        (
+          !request.TravelOutsideDetails ||
+          !request.TravelOutsideDetails.trim()
+        )
+      ) {
+
+        addError(
+          validation,
+          "TravelOutsideDetails",
+          "Enter details about travel outside the UK."
+        );
+      }
+
+
+      if (
+        !request
+          .letterofconfirmationforauthorise
+      ) {
+
+        addError(
+          validation,
+          "letterofconfirmationforauthorise",
+          "Select whether you require a letter of confirmation."
+        );
+      }
+
+
+      if (
+        request
+          .letterofconfirmationforauthorise ===
+          "Yes" &&
+        (
+          !request
+            .Reasonforrequestingaletter ||
+          !request
+            .Reasonforrequestingaletter
+            .trim()
+        )
+      ) {
+
+        addError(
+          validation,
+          "Reasonforrequestingaletter",
+          "Enter the reason for requesting a letter."
+        );
+      }
+
+
+      setErrors(
+        validation
+      );
+
+
+      if (
+        validation.length > 0
+      ) {
+
+        const firstField =
+          validation[0].field;
+
 
         if (
-          activeExistingEvidence.length +
-          files.length === 0
+          firstField === "Student" ||
+          firstField === "Title" ||
+          firstField === "DoB" ||
+          firstField === "LevelOfStudy" ||
+          firstField === "Programme"
         ) {
-          return "Add at least one supporting evidence file.";
+
+          setStep(
+            1
+          );
+
+        } else if (
+          firstField === "AbsenceStartDate" ||
+          firstField === "AbsenceEndDate" ||
+          firstField === "AbsenceReasons"
+        ) {
+
+          setStep(
+            2
+          );
+
+        } else {
+
+          setStep(
+            3
+          );
         }
+
+
+        return false;
       }
 
-      return "";
+
+      return true;
     };
 
 
   /* =====================================================
      NAVIGATION
-  ===================================================== */
+     ===================================================== */
 
-  const next = (): void => {
+  const next =
+    ():
+    void => {
 
-    const validationError =
-      validateStep();
-
-    if (validationError) {
-
-      setError(validationError);
-
-      window.scrollTo(
-        0,
-        0
-      );
-
-      return;
-    }
-
-    setError("");
-
-    setStep(
-      (step + 1) as FormStep
-    );
-
-    window.scrollTo(
-      0,
-      0
-    );
-  };
-
-
-  const back = (): void => {
-
-    setError("");
-
-    setStep(
-      (step - 1) as FormStep
-    );
-
-    window.scrollTo(
-      0,
-      0
-    );
-  };
-
-
-  /* =====================================================
-     FILES
-  ===================================================== */
-
-  const handleFileChange = (
-    event:
-      React.ChangeEvent<HTMLInputElement>
-  ): void => {
-
-    const fileList =
-      event.target.files;
-
-    if (!fileList) {
-      return;
-    }
-
-    const selectedFiles:
-      File[] = [];
-
-
-    for (
-      let i = 0;
-      i < fileList.length;
-      i++
-    ) {
-
-      const file =
-        fileList.item(i);
-
-      if (file) {
-        selectedFiles.push(
-          file
-        );
-      }
-    }
-
-
-    setFiles(
-      current => [
-        ...current,
-        ...selectedFiles
-      ]
-    );
-
-    event.target.value = "";
-  };
-
-
-  const removeNewFile = (
-    index: number
-  ): void => {
-
-    setFiles(
-      files.filter(
-        (
-          _file,
-          fileIndex
-        ) =>
-          fileIndex !== index
-      )
-    );
-  };
-
-
-  const deleteExistingFile = (
-    fileName: string
-  ): void => {
-
-    if (
-      deleted.indexOf(
-        fileName
-      ) === -1
-    ) {
-
-      setDeleted([
-        ...deleted,
-        fileName
-      ]);
-    }
-  };
-
-
-  const undoDelete = (
-    fileName: string
-  ): void => {
-
-    setDeleted(
-      deleted.filter(
-        value =>
-          value !== fileName
-      )
-    );
-  };
-
-
-  /* =====================================================
-     SAVE
-  ===================================================== */
-
-  const saveDraft =
-    async (): Promise<void> => {
-
-      try {
-
-        setSaving(true);
-        setError("");
-
-        if (p.adminMode && p.onAdminSave) {
-          await p.onAdminSave(
-            r,
-            files,
-            deleted
-          );
-        } else {
-          await p.onSaveDraft(
-            r,
-            files,
-            deleted
-          );
-        }
-
-      } catch (err) {
-
-        console.error(
-          "Save draft failed.",
-          err
-        );
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to save your draft."
-        );
-
-      } finally {
-
-        setSaving(false);
-      }
-    };
-
-
-  /* =====================================================
-     FINAL VALIDATION
-  ===================================================== */
-
-  const validateAll =
-    (): FormStep | 0 => {
-
-      if (
-        !r.StudentId ||
-        !r.Title ||
-        !r.DoB ||
-        !r.LevelOfStudy ||
-        !r.Programme ||
-        !r.AdminTermGuid ||
-        !r.AdminLabel
-      ) {
-        return 1;
-      }
+      setPageError("");
 
 
       if (
-        !r.AbsenceStartDate ||
-        !r.AbsenceEndDate ||
-        (r.AbsenceReasons || [])
-          .length === 0
+        !validateCurrentStep()
       ) {
-        return 2;
-      }
-
-
-      if (
-        r.AbsenceStartDate >
-        r.AbsenceEndDate
-      ) {
-        return 2;
-      }
-
-
-      if (
-        hasReason("Other") &&
-        !r.ReasonOtherComments
-      ) {
-        return 2;
-      }
-
-
-      if (
-        !r.TravelOutside ||
-        !r
-          .letterofconfirmationforauthorise
-      ) {
-        return 3;
-      }
-
-
-      if (
-        r.TravelOutside === "Yes" &&
-        !r.TravelOutsideDetails
-      ) {
-        return 3;
-      }
-
-
-      if (
-        r
-          .letterofconfirmationforauthorise ===
-          "Yes" &&
-        !r
-          .Reasonforrequestingaletter
-      ) {
-        return 3;
-      }
-
-
-      const activeExistingEvidence =
-        (r.AttachmentFiles || []).filter(
-          attachment =>
-            deleted.indexOf(
-              attachment.FileName
-            ) === -1
-        );
-
-      if (
-        activeExistingEvidence.length +
-        files.length === 0
-      ) {
-        return 4;
-      }
-
-
-      return 0;
-    };
-
-
-  const submitRequest =
-    async (): Promise<void> => {
-
-      const invalidStep =
-        validateAll();
-
-      if (invalidStep !== 0) {
-
-        setStep(invalidStep);
-
-        setError(
-          "Please complete all required fields before submitting your request."
-        );
 
         window.scrollTo(
           0,
           0
         );
+
+
+        return;
+      }
+
+
+      if (
+        step < 5
+      ) {
+
+        setStep(
+          step + 1
+        );
+
+
+        setErrors([]);
+
+
+        window.scrollTo(
+          0,
+          0
+        );
+      }
+    };
+
+
+  const back =
+    ():
+    void => {
+
+      setPageError("");
+
+
+      setErrors([]);
+
+
+      if (
+        step > 1
+      ) {
+
+        setStep(
+          step - 1
+        );
+
+
+        window.scrollTo(
+          0,
+          0
+        );
+
+      } else {
+
+        props.onCancel();
+      }
+    };
+
+
+  /* =====================================================
+     SAVE
+     ===================================================== */
+
+  const saveDraft =
+    async ():
+    Promise<void> => {
+
+      if (
+        saving
+      ) {
 
         return;
       }
@@ -617,302 +898,673 @@ React.FC<Props> = (p) => {
 
       try {
 
-        setSaving(true);
-        setError("");
-
-        await p.onSubmit(
-          r,
-          files,
-          deleted
+        setSaving(
+          true
         );
 
-      } catch (err) {
+
+        setPageError("");
+
+
+        /*
+         * Admin editing an existing workflow item
+         * should not reset it to Draft.
+         */
+        if (
+          props.adminMode &&
+          request.Id &&
+          props.onAdminSave
+        ) {
+
+          await props.onAdminSave(
+            request,
+            files,
+            deletedFiles
+          );
+
+        } else {
+
+          await props.onSaveDraft(
+            request,
+            files,
+            deletedFiles
+          );
+        }
+
+
+        props.onCancel();
+
+      } catch (error) {
 
         console.error(
-          "Submit failed.",
-          err
+          "Unable to save request.",
+          error
         );
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to submit your request."
+
+        setPageError(
+          error instanceof Error
+            ? error.message
+            : "Unable to save the request."
+        );
+
+
+        window.scrollTo(
+          0,
+          0
         );
 
       } finally {
 
-        setSaving(false);
+        setSaving(
+          false
+        );
+      }
+    };
+
+
+  const submit =
+    async ():
+    Promise<void> => {
+
+      if (
+        saving
+      ) {
+
+        return;
+      }
+
+
+      if (
+        !validateAll()
+      ) {
+
+        window.scrollTo(
+          0,
+          0
+        );
+
+
+        return;
+      }
+
+
+      try {
+
+        setSaving(
+          true
+        );
+
+
+        setPageError("");
+
+
+        await props.onSubmit(
+          request,
+          files,
+          deletedFiles
+        );
+
+
+        props.onCancel();
+
+      } catch (error) {
+
+        console.error(
+          "Unable to submit request.",
+          error
+        );
+
+
+        setPageError(
+          error instanceof Error
+            ? error.message
+            : "Unable to submit the request."
+        );
+
+
+        window.scrollTo(
+          0,
+          0
+        );
+
+      } finally {
+
+        setSaving(
+          false
+        );
       }
     };
 
 
   /* =====================================================
-     ATTACHMENTS
-  ===================================================== */
+     ABSENCE REASONS
+     ===================================================== */
 
-  const existing =
-    r.AttachmentFiles || [];
-
-
-  const existingActive =
-    existing.filter(
-      attachment =>
-        deleted.indexOf(
-          attachment.FileName
-        ) === -1
-    );
+  const reasonOptions: string[] =
+    props.absenceReasonOptions || [];
 
 
-  const evidenceCount =
-    existingActive.length +
-    files.length;
+  const toggleReason =
+    (
+      reason: string
+    ):
+    void => {
+
+      const current =
+        request.AbsenceReasons
+          ? request.AbsenceReasons.slice()
+          : [];
 
 
-  const selectedStudent: IUserOption | undefined =
-    r.StudentId
-      ? {
-          Id: r.StudentId,
-          Title: r.Student ? r.Student.Title || "" : "",
-          Email: r.Student ? r.Student.EMail || "" : "",
-          LoginName: r.Student ? r.Student.LoginName || "" : ""
-        }
-      : undefined;
+      const index =
+        current.indexOf(
+          reason
+        );
 
 
-  /* =====================================================
-     RENDER
-  ===================================================== */
+      if (
+        index === -1
+      ) {
 
-  return (
+        current.push(
+          reason
+        );
 
-    <div className="formPage">
+      } else {
 
-      <div className="formTitle">
-
-        <h1>
-          Authorised Absence Request
-        </h1>
-
-        <p className="pageIntro">
-          Use this form to request an
-          authorised period of absence.
-          Complete all required fields and
-          provide supporting evidence where
-          appropriate.
-        </p>
-
-        <p className="requiredMessage">
-          <span className="required">
-            *
-          </span>
-          {" "}
-          Required information
-        </p>
-
-      </div>
-
-
-      {/* =================================================
-          STEPPER
-      ================================================= */}
-
-      <div className="stepper">
-
-        {
-          [1, 2, 3, 4, 5].map(
-            stepNumber => {
-
-              let stepClass =
-                "";
-
-              if (
-                stepNumber === step
-              ) {
-
-                stepClass =
-                  "active";
-
-              } else if (
-                stepNumber < step
-              ) {
-
-                stepClass =
-                  "done";
-              }
-
-
-              return (
-
-                <div
-                  key={stepNumber}
-                  className={
-                    stepClass
-                  }
-                >
-
-                  <b>
-                    {stepNumber}
-                  </b>
-
-                  <span>
-                    {
-                      stepLabels[
-                        stepNumber - 1
-                      ]
-                    }
-                  </span>
-
-                </div>
-              );
-            }
-          )
-        }
-
-      </div>
-
-
-      {
-        error &&
-        (
-          <div
-            className="error"
-            role="alert"
-          >
-
-            <strong>
-              There is a problem
-            </strong>
-
-            <div>
-              {error}
-            </div>
-
-          </div>
-        )
+        current.splice(
+          index,
+          1
+        );
       }
 
 
-      {/* =================================================
-          STEP 1
-      ================================================= */}
+      update({
 
-      {
-        step === 1 &&
-        (
-          <section>
+        AbsenceReasons:
+          current
+      });
 
-            <h2>
-              Student Details
-            </h2>
 
-            <p className="sectionIntro">
-              Tell us about your student
-              record and programme.
-            </p>
+      clearFieldError(
+        "AbsenceReasons"
+      );
+    };
 
-            <PeoplePicker
-              id="student"
-              label="Student"
-              required
-              value={selectedStudent}
-              disabled={false}
-              onSearch={p.onSearchUsers}
-              onResolve={p.onResolveUser}
-              onChange={(user?: IUserOption): void => {
-                patch({
-                  StudentId: user ? user.Id : undefined,
-                  Student: user
-                    ? {
-                        Id: user.Id,
-                        Title: user.Title,
-                        EMail: user.Email || "",
-                        LoginName: user.LoginName || ""
-                      }
-                    : undefined
+
+  /* =====================================================
+     FILES
+     ===================================================== */
+
+  const allowedExtensions =
+    [
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".jpg",
+      ".jpeg",
+      ".png"
+    ];
+
+
+  const addFiles =
+    (
+      event:
+        React.ChangeEvent<HTMLInputElement>
+    ):
+    void => {
+
+      const selected =
+        event.target.files;
+
+
+      if (
+        !selected
+      ) {
+
+        return;
+      }
+
+
+      const newFiles:
+        File[] = [];
+
+
+      let validationMessage =
+        "";
+
+
+      for (
+        let i = 0;
+        i < selected.length;
+        i++
+      ) {
+
+        const file =
+          selected[i];
+
+
+        const lowerName =
+          file.name.toLowerCase();
+
+
+        const dot =
+          lowerName.lastIndexOf(".");
+
+
+        const extension =
+          dot >= 0
+            ? lowerName.substring(
+                dot
+              )
+            : "";
+
+
+        if (
+          allowedExtensions.indexOf(
+            extension
+          ) === -1
+        ) {
+
+          validationMessage =
+            "Only PDF, DOC, DOCX, JPG, JPEG and PNG files are allowed.";
+
+
+          continue;
+        }
+
+
+        const maxSize =
+          10 *
+          1024 *
+          1024;
+
+
+        if (
+          file.size >
+          maxSize
+        ) {
+
+          validationMessage =
+            "Each attachment must be 10 MB or smaller.";
+
+
+          continue;
+        }
+
+
+        newFiles.push(
+          file
+        );
+      }
+
+
+      if (
+        validationMessage
+      ) {
+
+        setPageError(
+          validationMessage
+        );
+      }
+
+
+      if (
+        newFiles.length > 0
+      ) {
+
+        setFiles(
+          current =>
+            current.concat(
+              newFiles
+            )
+        );
+      }
+
+
+      event.target.value =
+        "";
+    };
+
+
+  const removeNewFile =
+    (
+      index: number
+    ):
+    void => {
+
+      setFiles(
+        current =>
+          current.filter(
+            (
+              unused,
+              currentIndex
+            ) =>
+              currentIndex !== index
+          )
+      );
+    };
+
+
+  const markExistingFileDeleted =
+    (
+      fileName: string
+    ):
+    void => {
+
+      if (
+        deletedFiles.indexOf(
+          fileName
+        ) !== -1
+      ) {
+
+        return;
+      }
+
+
+      setDeletedFiles(
+        current =>
+          current.concat(
+            [
+              fileName
+            ]
+          )
+      );
+    };
+
+
+  const undoExistingFileDelete =
+    (
+      fileName: string
+    ):
+    void => {
+
+      setDeletedFiles(
+        current =>
+          current.filter(
+            item =>
+              item !== fileName
+          )
+      );
+    };
+
+
+  /* =====================================================
+     STEPPER
+     ===================================================== */
+
+  const renderStepper =
+    ():
+    JSX.Element => {
+
+      const labels =
+        [
+          "Student details",
+          "Absence details",
+          "Travel / Letter",
+          "Evidence",
+          "Review"
+        ];
+
+
+      return (
+
+        <div
+          className="stepper"
+          aria-label="Request progress"
+        >
+
+          {
+            labels.map(
+              (
+                label,
+                index
+              ) => {
+
+                const number =
+                  index + 1;
+
+
+                let className =
+                  "step";
+
+
+                if (
+                  number === step
+                ) {
+
+                  className +=
+                    " active";
+
+                } else if (
+                  number < step
+                ) {
+
+                  className +=
+                    " done";
+                }
+
+
+                return (
+
+                  <div
+                    className={className}
+                    key={label}
+                  >
+
+                    <span>
+                      {number}
+                    </span>
+
+                    <strong>
+                      {label}
+                    </strong>
+
+                  </div>
+                );
+              }
+            )
+          }
+
+        </div>
+      );
+    };
+
+
+  /* =====================================================
+     STEP 1
+     ===================================================== */
+
+  const renderStudentDetails =
+    ():
+    JSX.Element => {
+
+      return (
+
+        <div className="formPage">
+
+          <h2>
+            Student details
+          </h2>
+
+
+          <p className="sectionIntro">
+            Enter the details of the student making the authorised absence request.
+          </p>
+
+
+          <PeoplePicker
+            id="student"
+            label="Student"
+            required
+            value={selectedStudent}
+            disabled={false}
+            error={
+              getFieldError(
+                "Student"
+              )
+            }
+            onSearch={
+              props.onSearchUsers
+            }
+            onResolve={
+              props.onResolveUser
+            }
+            onChange={
+              user => {
+
+                update({
+
+                  StudentId:
+                    user
+                      ? user.Id
+                      : undefined,
+
+                  Student:
+                    user
+                      ? toSharePointUser(
+                          user
+                        )
+                      : undefined
                 });
-              }}
+
+
+                clearFieldError(
+                  "Student"
+                );
+              }
+            }
+          />
+
+
+          <div className="formGroup">
+
+            <label htmlFor="studentId">
+
+              Student ID
+
+              <span className="required">
+                {" *"}
+              </span>
+
+            </label>
+
+
+            <input
+              id="studentId"
+              type="text"
+              value={
+                request.Title || ""
+              }
+              aria-invalid={
+                !!getFieldError(
+                  "Title"
+                )
+              }
+              onChange={
+                event => {
+
+                  update({
+
+                    Title:
+                      event.target.value
+                  });
+
+
+                  clearFieldError(
+                    "Title"
+                  );
+                }
+              }
             />
 
 
-            <div className="formGroup">
+            {
+              getFieldError(
+                "Title"
+              ) &&
+              <div className="errorMessage">
 
-              <label htmlFor="studentId">
-
-                Student ID
-
-                <span className="required">
-                  {" *"}
-                </span>
-
-                <span className="hint">
-                  Enter your University
-                  student ID.
-                </span>
-
-              </label>
-
-              <input
-                id="studentId"
-                type="text"
-                value={
-                  r.Title || ""
+                {
+                  getFieldError(
+                    "Title"
+                  )
                 }
-                onChange={
-                  e =>
-                    patch({
-                      Title:
-                        e.target.value
-                    })
-                }
-              />
 
-            </div>
+              </div>
+            }
 
+          </div>
+
+
+          <div className="formRow">
 
             <div className="formGroup">
 
               <label htmlFor="dob">
 
-                Date of Birth
+                Date of birth
 
                 <span className="required">
                   {" *"}
                 </span>
 
-                <span className="hint">
-                  Enter your date of birth.
-                </span>
-
               </label>
+
 
               <input
                 id="dob"
                 type="date"
                 value={
-                  r.DoB
-                    ? r.DoB.substring(
-                        0,
-                        10
-                      )
-                    : ""
+                  request.DoB || ""
+                }
+                aria-invalid={
+                  !!getFieldError(
+                    "DoB"
+                  )
                 }
                 onChange={
-                  e =>
-                    patch({
+                  event => {
+
+                    update({
+
                       DoB:
-                        e.target.value
-                    })
+                        event.target.value
+                    });
+
+
+                    clearFieldError(
+                      "DoB"
+                    );
+                  }
                 }
               />
+
+
+              {
+                getFieldError(
+                  "DoB"
+                ) &&
+                <div className="errorMessage">
+
+                  {
+                    getFieldError(
+                      "DoB"
+                    )
+                  }
+
+                </div>
+              }
 
             </div>
 
 
             <div className="formGroup">
 
-              <label htmlFor="level">
+              <label htmlFor="levelOfStudy">
 
-                Level of Study
+                Level of study
 
                 <span className="required">
                   {" *"}
@@ -920,23 +1572,37 @@ React.FC<Props> = (p) => {
 
               </label>
 
+
               <select
-                id="level"
+                id="levelOfStudy"
                 value={
-                  r.LevelOfStudy ||
+                  request.LevelOfStudy ||
                   ""
                 }
+                aria-invalid={
+                  !!getFieldError(
+                    "LevelOfStudy"
+                  )
+                }
                 onChange={
-                  e =>
-                    patch({
+                  event => {
+
+                    update({
+
                       LevelOfStudy:
-                        e.target.value
-                    })
+                        event.target.value
+                    });
+
+
+                    clearFieldError(
+                      "LevelOfStudy"
+                    );
+                  }
                 }
               >
 
                 <option value="">
-                  Select level of study
+                  Select
                 </option>
 
                 <option value="Undergraduate">
@@ -953,295 +1619,182 @@ React.FC<Props> = (p) => {
 
               </select>
 
-            </div>
 
+              {
+                getFieldError(
+                  "LevelOfStudy"
+                ) &&
+                <div className="errorMessage">
 
-            <div className="formGroup">
+                  {
+                    getFieldError(
+                      "LevelOfStudy"
+                    )
+                  }
 
-              <label htmlFor="programme">
-
-                Programme of Study
-
-                <span className="required">
-                  {" *"}
-                </span>
-
-                <span className="hint">
-                  Enter the name of your
-                  programme.
-                </span>
-
-              </label>
-
-              <input
-                id="programme"
-                type="text"
-                value={
-                  r.Programme ||
-                  ""
-                }
-                onChange={
-                  e =>
-                    patch({
-                      Programme:
-                        e.target.value
-                    })
-                }
-              />
+                </div>
+              }
 
             </div>
 
+          </div>
 
-            <AdminManagedMetadata
-              valueLabel={
-                r.AdminLabel
+
+          <div className="formGroup">
+
+            <label htmlFor="programme">
+
+              Programme
+
+              <span className="required">
+                {" *"}
+              </span>
+
+            </label>
+
+
+            <input
+              id="programme"
+              type="text"
+              value={
+                request.Programme ||
+                ""
               }
-              valueTermGuid={
-                r.AdminTermGuid
+              aria-invalid={
+                !!getFieldError(
+                  "Programme"
+                )
               }
-              options={
-                p.adminOptions || []
-              }
-              loading={
-                p.adminOptionsLoading
-              }
-              required
-              disabled={saving}
               onChange={
-                (
-                  value?: IAdminTermOption
-                ): void => {
+                event => {
 
-                  patch({
-                    AdminLabel:
-                      value
-                        ? value.label
-                        : undefined,
-                    AdminTermGuid:
-                      value
-                        ? value.termGuid
-                        : undefined
+                  update({
+
+                    Programme:
+                      event.target.value
                   });
+
+
+                  clearFieldError(
+                    "Programme"
+                  );
                 }
               }
             />
 
-          </section>
-        )
-      }
 
+            {
+              getFieldError(
+                "Programme"
+              ) &&
+              <div className="errorMessage">
 
-      {/* =================================================
-          STEP 2
-      ================================================= */}
-
-      {
-        step === 2 &&
-        (
-          <section>
-
-            <h2>
-              Absence Details
-            </h2>
-
-            <p className="sectionIntro">
-              Tell us when you will be
-              absent and why.
-            </p>
-
-
-            <div className="formRow">
-
-              <div className="formGroup">
-
-                <label htmlFor="startDate">
-
-                  Start Date
-
-                  <span className="required">
-                    {" *"}
-                  </span>
-
-                </label>
-
-                <input
-                  id="startDate"
-                  type="date"
-                  value={
-                    r.AbsenceStartDate
-                      ? r
-                          .AbsenceStartDate
-                          .substring(0, 10)
-                      : ""
-                  }
-                  onChange={
-                    e =>
-                      patch({
-                        AbsenceStartDate:
-                          e.target.value
-                      })
-                  }
-                />
+                {
+                  getFieldError(
+                    "Programme"
+                  )
+                }
 
               </div>
+            }
+
+          </div>
+
+        </div>
+      );
+    };
 
 
-              <div className="formGroup">
+  /* =====================================================
+     STEP 2
+     ===================================================== */
 
-                <label htmlFor="endDate">
+  const renderAbsenceDetails =
+    ():
+    JSX.Element => {
 
-                  End Date
+      return (
 
-                  <span className="required">
-                    {" *"}
-                  </span>
+        <div className="formPage">
 
-                </label>
-
-                <input
-                  id="endDate"
-                  type="date"
-                  value={
-                    r.AbsenceEndDate
-                      ? r
-                          .AbsenceEndDate
-                          .substring(0, 10)
-                      : ""
-                  }
-                  onChange={
-                    e =>
-                      patch({
-                        AbsenceEndDate:
-                          e.target.value
-                      })
-                  }
-                />
-
-              </div>
-
-            </div>
+          <h2>
+            Absence details
+          </h2>
 
 
-            <fieldset>
+          <p className="sectionIntro">
+            Enter the dates and reason for the requested absence.
+          </p>
 
-              <legend>
-                Reason(s) for absence
+
+          <div className="formRow">
+
+            <div className="formGroup">
+
+              <label htmlFor="absenceStartDate">
+
+                Start date
+
                 <span className="required">
                   {" *"}
                 </span>
-              </legend>
 
-              <span className="hint">
-                Select all options that apply.
-              </span>
+              </label>
+
+
+              <input
+                id="absenceStartDate"
+                type="date"
+                value={
+                  request.AbsenceStartDate ||
+                  ""
+                }
+                aria-invalid={
+                  !!getFieldError(
+                    "AbsenceStartDate"
+                  )
+                }
+                onChange={
+                  event => {
+
+                    update({
+
+                      AbsenceStartDate:
+                        event.target.value
+                    });
+
+
+                    clearFieldError(
+                      "AbsenceStartDate"
+                    );
+                  }
+                }
+              />
 
 
               {
-                reasons.map(
-                  reason => (
+                getFieldError(
+                  "AbsenceStartDate"
+                ) &&
+                <div className="errorMessage">
 
-                    <label
-                      className="check"
-                      key={reason}
-                    >
+                  {
+                    getFieldError(
+                      "AbsenceStartDate"
+                    )
+                  }
 
-                      <input
-                        type="checkbox"
-                        checked={
-                          (
-                            r.AbsenceReasons ||
-                            []
-                          ).indexOf(
-                            reason
-                          ) !== -1
-                        }
-                        onChange={
-                          () =>
-                            toggleReason(
-                              reason
-                            )
-                        }
-                      />
-
-                      <span>
-                        {reason}
-                      </span>
-
-                    </label>
-                  )
-                )
+                </div>
               }
 
-            </fieldset>
-
-
-            {
-              hasReason("Other") &&
-              (
-                <div className="formGroup">
-
-                  <label htmlFor="otherReason">
-
-                    Details of Absence
-
-                    <span className="required">
-                      {" *"}
-                    </span>
-
-                  </label>
-
-                  <textarea
-                    id="otherReason"
-                    rows={5}
-                    value={
-                      r
-                        .ReasonOtherComments ||
-                      ""
-                    }
-                    onChange={
-                      e =>
-                        patch({
-                          ReasonOtherComments:
-                            e.target.value
-                        })
-                    }
-                  />
-
-                </div>
-              )
-            }
-
-          </section>
-        )
-      }
-
-
-      {/* =================================================
-          STEP 3
-      ================================================= */}
-
-      {
-        step === 3 &&
-        (
-          <section>
-
-            <h2>
-              Travel and Letter Details
-            </h2>
-
-            <p className="sectionIntro">
-              Tell us about any international
-              travel and whether you require
-              confirmation of approval.
-            </p>
+            </div>
 
 
             <div className="formGroup">
 
-              <label htmlFor="travelOutside">
+              <label htmlFor="absenceEndDate">
 
-                Will you be travelling
-                outside the UK?
+                End date
 
                 <span className="required">
                   {" *"}
@@ -1249,741 +1802,1194 @@ React.FC<Props> = (p) => {
 
               </label>
 
-              <select
-                id="travelOutside"
-                value={
-                  r.TravelOutside ||
-                  ""
-                }
-                onChange={
-                  e =>
-                    patch({
-                      TravelOutside:
-                        e.target.value
-                    })
-                }
-              >
-
-                <option value="">
-                  Select an option
-                </option>
-
-                <option value="Yes">
-                  Yes
-                </option>
-
-                <option value="No">
-                  No
-                </option>
-
-              </select>
-
-            </div>
-
-
-            {
-              r.TravelOutside ===
-                "Yes" &&
-              (
-                <div className="formGroup">
-
-                  <label htmlFor="travelDetails">
-
-                    Travel Details
-
-                    <span className="required">
-                      {" *"}
-                    </span>
-
-                    <span className="hint">
-                      Provide details of your
-                      destination and travel.
-                    </span>
-
-                  </label>
-
-                  <textarea
-                    id="travelDetails"
-                    rows={5}
-                    value={
-                      r
-                        .TravelOutsideDetails ||
-                      ""
-                    }
-                    onChange={
-                      e =>
-                        patch({
-                          TravelOutsideDetails:
-                            e.target.value
-                        })
-                    }
-                  />
-
-                </div>
-              )
-            }
-
-
-            <div className="formGroup">
-
-              <label htmlFor="letterRequired">
-
-                Do you need a letter
-                confirming approval?
-
-                <span className="required">
-                  {" *"}
-                </span>
-
-              </label>
-
-              <select
-                id="letterRequired"
-                value={
-                  r
-                    .letterofconfirmationforauthorise ||
-                  ""
-                }
-                onChange={
-                  e =>
-                    patch({
-                      letterofconfirmationforauthorise:
-                        e.target.value
-                    })
-                }
-              >
-
-                <option value="">
-                  Select an option
-                </option>
-
-                <option value="Yes">
-                  Yes
-                </option>
-
-                <option value="No">
-                  No
-                </option>
-
-              </select>
-
-            </div>
-
-
-            {
-              r
-                .letterofconfirmationforauthorise ===
-                "Yes" &&
-              (
-                <div className="formGroup">
-
-                  <label htmlFor="letterReason">
-
-                    Reason for Requesting
-                    a Letter
-
-                    <span className="required">
-                      {" *"}
-                    </span>
-
-                  </label>
-
-                  <textarea
-                    id="letterReason"
-                    rows={5}
-                    value={
-                      r
-                        .Reasonforrequestingaletter ||
-                      ""
-                    }
-                    onChange={
-                      e =>
-                        patch({
-                          Reasonforrequestingaletter:
-                            e.target.value
-                        })
-                    }
-                  />
-
-                </div>
-              )
-            }
-
-          </section>
-        )
-      }
-
-
-      {/* =================================================
-          STEP 4
-      ================================================= */}
-
-      {
-        step === 4 &&
-        (
-          <section>
-
-            <h2>
-              Supporting Evidence
-            </h2>
-
-            <p className="sectionIntro">
-              Upload supporting documents
-              where appropriate.
-            </p>
-
-
-            <div className="infoBox">
-
-              <strong>
-                Accepted file types
-              </strong>
-
-              <p>
-                PDF, Word documents and
-                JPG/PNG images.
-              </p>
-
-            </div>
-
-
-            <div className="formGroup">
-
-              <label htmlFor="evidence">
-
-                Add Evidence
-
-                <span className="required">
-                  {" *"}
-                </span>
-
-                <span className="hint">
-                  You can select more than
-                  one file.
-                </span>
-
-              </label>
 
               <input
-                id="evidence"
-                type="file"
-                multiple
-                accept={
-                  ".pdf,.doc,.docx," +
-                  ".jpg,.jpeg,.png"
+                id="absenceEndDate"
+                type="date"
+                value={
+                  request.AbsenceEndDate ||
+                  ""
+                }
+                aria-invalid={
+                  !!getFieldError(
+                    "AbsenceEndDate"
+                  )
                 }
                 onChange={
-                  handleFileChange
+                  event => {
+
+                    update({
+
+                      AbsenceEndDate:
+                        event.target.value
+                    });
+
+
+                    clearFieldError(
+                      "AbsenceEndDate"
+                    );
+                  }
+                }
+              />
+
+
+              {
+                getFieldError(
+                  "AbsenceEndDate"
+                ) &&
+                <div className="errorMessage">
+
+                  {
+                    getFieldError(
+                      "AbsenceEndDate"
+                    )
+                  }
+
+                </div>
+              }
+
+            </div>
+
+          </div>
+
+
+          <fieldset className="formGroup">
+
+            <legend>
+
+              Reason for absence
+
+              <span className="required">
+                {" *"}
+              </span>
+
+            </legend>
+
+
+            <p className="hint">
+              Select all that apply.
+            </p>
+
+
+            {
+              reasonOptions.map(
+                reason => (
+
+                  <label
+                    className="check"
+                    key={reason}
+                  >
+
+                    <input
+                      type="checkbox"
+                      checked={
+                        (
+                          request.AbsenceReasons ||
+                          []
+                        ).indexOf(
+                          reason
+                        ) !== -1
+                      }
+                      onChange={
+                        () => {
+
+                          toggleReason(
+                            reason
+                          );
+                        }
+                      }
+                    />
+
+                    <span>
+                      {reason}
+                    </span>
+
+                  </label>
+                )
+              )
+            }
+
+
+            {
+              getFieldError(
+                "AbsenceReasons"
+              ) &&
+              <div className="errorMessage">
+
+                {
+                  getFieldError(
+                    "AbsenceReasons"
+                  )
+                }
+
+              </div>
+            }
+
+          </fieldset>
+
+
+          {
+            (
+              request.AbsenceReasons ||
+              []
+            ).indexOf(
+              "Other"
+            ) !== -1 &&
+            <div className="formGroup">
+
+              <label htmlFor="otherReason">
+                Other reason
+              </label>
+
+
+              <textarea
+                id="otherReason"
+                rows={4}
+                value={
+                  request
+                    .ReasonOtherComments ||
+                  ""
+                }
+                onChange={
+                  event => {
+
+                    update({
+
+                      ReasonOtherComments:
+                        event.target.value
+                    });
+                  }
                 }
               />
 
             </div>
+          }
+
+
+          {
+            (
+              request.AbsenceReasons ||
+              []
+            ).indexOf(
+              "Family illness"
+            ) !== -1 &&
+            <div className="formGroup">
+
+              <label htmlFor="familyIllnessDetails">
+                Family illness details
+              </label>
+
+
+              <textarea
+                id="familyIllnessDetails"
+                rows={4}
+                value={
+                  request
+                    .FamilyIllnessDetails ||
+                  ""
+                }
+                onChange={
+                  event => {
+
+                    update({
+
+                      FamilyIllnessDetails:
+                        event.target.value
+                    });
+                  }
+                }
+              />
+
+            </div>
+          }
+
+
+          {
+            (
+              request.AbsenceReasons ||
+              []
+            ).indexOf(
+              "Medical"
+            ) !== -1 &&
+            <div className="formGroup">
+
+              <label htmlFor="medicalEvidenceDetails">
+                Medical evidence details
+              </label>
+
+
+              <textarea
+                id="medicalEvidenceDetails"
+                rows={4}
+                value={
+                  request
+                    .MedicalEvidenceDetails ||
+                  ""
+                }
+                onChange={
+                  event => {
+
+                    update({
+
+                      MedicalEvidenceDetails:
+                        event.target.value
+                    });
+                  }
+                }
+              />
+
+            </div>
+          }
+
+        </div>
+      );
+    };
+
+
+  /* =====================================================
+     STEP 3
+     ===================================================== */
+
+  const renderTravelLetter =
+    ():
+    JSX.Element => {
+
+      return (
+
+        <div className="formPage">
+
+          <h2>
+            Travel and confirmation letter
+          </h2>
+
+
+          <div className="formGroup">
+
+            <label htmlFor="travelOutside">
+
+              Will you travel outside the UK during the absence?
+
+              <span className="required">
+                {" *"}
+              </span>
+
+            </label>
+
+
+            <select
+              id="travelOutside"
+              value={
+                request.TravelOutside ||
+                ""
+              }
+              aria-invalid={
+                !!getFieldError(
+                  "TravelOutside"
+                )
+              }
+              onChange={
+                event => {
+
+                  const value =
+                    event.target.value;
+
+
+                  update({
+
+                    TravelOutside:
+                      value,
+
+                    TravelOutsideDetails:
+                      value === "Yes"
+                        ? request
+                            .TravelOutsideDetails
+                        : ""
+                  });
+
+
+                  clearFieldError(
+                    "TravelOutside"
+                  );
+
+
+                  if (
+                    value !== "Yes"
+                  ) {
+
+                    clearFieldError(
+                      "TravelOutsideDetails"
+                    );
+                  }
+                }
+              }
+            >
+
+              <option value="">
+                Select
+              </option>
+
+              <option value="Yes">
+                Yes
+              </option>
+
+              <option value="No">
+                No
+              </option>
+
+            </select>
 
 
             {
-              existing.length === 0 &&
-              files.length === 0 &&
-              (
-                <div className="emptyEvidence">
-                  No evidence files have
-                  been added.
-                </div>
-              )
+              getFieldError(
+                "TravelOutside"
+              ) &&
+              <div className="errorMessage">
+
+                {
+                  getFieldError(
+                    "TravelOutside"
+                  )
+                }
+
+              </div>
             }
+
+          </div>
+
+
+          {
+            request.TravelOutside ===
+              "Yes" &&
+            <div className="formGroup">
+
+              <label htmlFor="travelOutsideDetails">
+
+                Travel details
+
+                <span className="required">
+                  {" *"}
+                </span>
+
+              </label>
+
+
+              <textarea
+                id="travelOutsideDetails"
+                rows={4}
+                value={
+                  request
+                    .TravelOutsideDetails ||
+                  ""
+                }
+                aria-invalid={
+                  !!getFieldError(
+                    "TravelOutsideDetails"
+                  )
+                }
+                onChange={
+                  event => {
+
+                    update({
+
+                      TravelOutsideDetails:
+                        event.target.value
+                    });
+
+
+                    clearFieldError(
+                      "TravelOutsideDetails"
+                    );
+                  }
+                }
+              />
+
+
+              {
+                getFieldError(
+                  "TravelOutsideDetails"
+                ) &&
+                <div className="errorMessage">
+
+                  {
+                    getFieldError(
+                      "TravelOutsideDetails"
+                    )
+                  }
+
+                </div>
+              }
+
+            </div>
+          }
+
+
+          <div className="formGroup">
+
+            <label htmlFor="confirmationLetter">
+
+              Do you require a letter confirming the authorised absence?
+
+              <span className="required">
+                {" *"}
+              </span>
+
+            </label>
+
+
+            <select
+              id="confirmationLetter"
+              value={
+                request
+                  .letterofconfirmationforauthorise ||
+                ""
+              }
+              aria-invalid={
+                !!getFieldError(
+                  "letterofconfirmationforauthorise"
+                )
+              }
+              onChange={
+                event => {
+
+                  const value =
+                    event.target.value;
+
+
+                  update({
+
+                    letterofconfirmationforauthorise:
+                      value,
+
+                    Reasonforrequestingaletter:
+                      value === "Yes"
+                        ? request
+                            .Reasonforrequestingaletter
+                        : ""
+                  });
+
+
+                  clearFieldError(
+                    "letterofconfirmationforauthorise"
+                  );
+
+
+                  if (
+                    value !== "Yes"
+                  ) {
+
+                    clearFieldError(
+                      "Reasonforrequestingaletter"
+                    );
+                  }
+                }
+              }
+            >
+
+              <option value="">
+                Select
+              </option>
+
+              <option value="Yes">
+                Yes
+              </option>
+
+              <option value="No">
+                No
+              </option>
+
+            </select>
 
 
             {
-              existing.length > 0 &&
-              (
-                <div className="attachmentList">
+              getFieldError(
+                "letterofconfirmationforauthorise"
+              ) &&
+              <div className="errorMessage">
 
-                  <h3>
-                    Existing Evidence
-                  </h3>
+                {
+                  getFieldError(
+                    "letterofconfirmationforauthorise"
+                  )
+                }
 
-                  <ul>
-
-                    {
-                      existing.map(
-                        attachment => {
-
-                          const isDeleted =
-                            deleted.indexOf(
-                              attachment
-                                .FileName
-                            ) !== -1;
-
-
-                          return (
-
-                            <li
-                              key={
-                                attachment
-                                  .FileName
-                              }
-                            >
-
-                              <div>
-
-                                <span className="fileIcon">
-                                  DOC
-                                </span>
-
-                                <a
-                                  href={
-                                    attachment
-                                      .ServerRelativeUrl
-                                  }
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  {
-                                    attachment
-                                      .FileName
-                                  }
-                                </a>
-
-                              </div>
-
-
-                              {
-                                isDeleted
-                                  ? (
-                                    <button
-                                      type="button"
-                                      onClick={
-                                        () =>
-                                          undoDelete(
-                                            attachment
-                                              .FileName
-                                          )
-                                      }
-                                    >
-                                      Undo
-                                    </button>
-                                  )
-                                  : (
-                                    <button
-                                      type="button"
-                                      className="linkDanger"
-                                      onClick={
-                                        () =>
-                                          deleteExistingFile(
-                                            attachment
-                                              .FileName
-                                          )
-                                      }
-                                    >
-                                      Remove
-                                    </button>
-                                  )
-                              }
-
-                            </li>
-                          );
-                        }
-                      )
-                    }
-
-                  </ul>
-
-                </div>
-              )
+              </div>
             }
 
+          </div>
 
-            {
-              files.length > 0 &&
-              (
-                <div className="attachmentList">
 
-                  <h3>
-                    New Evidence
-                  </h3>
+          {
+            request
+              .letterofconfirmationforauthorise ===
+              "Yes" &&
+            <div className="formGroup">
 
-                  <ul>
+              <label htmlFor="letterReason">
 
-                    {
-                      files.map(
-                        (
-                          file,
-                          index
-                        ) => (
+                Reason for requesting a letter
 
-                          <li
-                            key={
-                              file.name +
-                              "-" +
-                              index
-                            }
-                          >
+                <span className="required">
+                  {" *"}
+                </span>
 
-                            <div>
+              </label>
 
-                              <span className="fileIcon">
-                                FILE
-                              </span>
 
-                              <span>
-                                {file.name}
-                              </span>
+              <textarea
+                id="letterReason"
+                rows={4}
+                value={
+                  request
+                    .Reasonforrequestingaletter ||
+                  ""
+                }
+                aria-invalid={
+                  !!getFieldError(
+                    "Reasonforrequestingaletter"
+                  )
+                }
+                onChange={
+                  event => {
 
-                            </div>
+                    update({
 
-                            <button
-                              type="button"
-                              className="linkDanger"
-                              onClick={
-                                () =>
-                                  removeNewFile(
-                                    index
-                                  )
-                              }
-                            >
-                              Remove
-                            </button>
+                      Reasonforrequestingaletter:
+                        event.target.value
+                    });
 
-                          </li>
-                        )
-                      )
-                    }
 
-                  </ul>
+                    clearFieldError(
+                      "Reasonforrequestingaletter"
+                    );
+                  }
+                }
+              />
+
+
+              {
+                getFieldError(
+                  "Reasonforrequestingaletter"
+                ) &&
+                <div className="errorMessage">
+
+                  {
+                    getFieldError(
+                      "Reasonforrequestingaletter"
+                    )
+                  }
 
                 </div>
-              )
-            }
+              }
 
-          </section>
-        )
-      }
+            </div>
+          }
 
-
-      {/* =================================================
-          STEP 5
-      ================================================= */}
-
-      {
-        step === 5 &&
-        (
-          <section>
-
-            <h2>
-              Review and Submit
-            </h2>
-
-            <p className="sectionIntro">
-              Check the information below
-              before submitting your request.
-            </p>
+        </div>
+      );
+    };
 
 
-            <div className="summary">
+  /* =====================================================
+     STEP 4
+     ===================================================== */
+
+  const renderEvidence =
+    ():
+    JSX.Element => {
+
+      const existingAttachments =
+        request.AttachmentFiles ||
+        [];
+
+
+      return (
+
+        <div className="formPage">
+
+          <h2>
+            Supporting evidence
+          </h2>
+
+
+          <p className="sectionIntro">
+            Upload supporting evidence relevant to the absence request.
+          </p>
+
+
+          <div className="infoBox">
+
+            Accepted file types: PDF, DOC, DOCX, JPG, JPEG and PNG.
+            Maximum file size: 10 MB per file.
+
+          </div>
+
+
+          <div className="formGroup">
+
+            <label htmlFor="evidenceFiles">
+              Add evidence
+            </label>
+
+
+            <input
+              id="evidenceFiles"
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              onChange={
+                addFiles
+              }
+            />
+
+          </div>
+
+
+          {
+            existingAttachments.length > 0 &&
+            <div className="attachmentList">
 
               <h3>
-                Student Details
+                Existing attachments
               </h3>
 
-              <p>
-                <b>Student:</b>
-                {" "}
+
+              {
+                existingAttachments.map(
+                  attachment => {
+
+                    const deleted =
+                      deletedFiles.indexOf(
+                        attachment.FileName
+                      ) !== -1;
+
+
+                    return (
+
+                      <div
+                        className="attachmentItem"
+                        key={
+                          attachment.FileName
+                        }
+                      >
+
+                        <span className="fileIcon">
+                          File
+                        </span>
+
+
+                        <a
+                          href={
+                            attachment.ServerRelativeUrl
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {
+                            attachment.FileName
+                          }
+                        </a>
+
+
+                        {
+                          deleted
+                            ? (
+                              <button
+                                type="button"
+                                className="secondaryButton"
+                                onClick={
+                                  () => {
+
+                                    undoExistingFileDelete(
+                                      attachment.FileName
+                                    );
+                                  }
+                                }
+                              >
+                                Undo remove
+                              </button>
+                            )
+                            : (
+                              <button
+                                type="button"
+                                className="linkDanger"
+                                onClick={
+                                  () => {
+
+                                    markExistingFileDeleted(
+                                      attachment.FileName
+                                    );
+                                  }
+                                }
+                              >
+                                Remove
+                              </button>
+                            )
+                        }
+
+                      </div>
+                    );
+                  }
+                )
+              }
+
+            </div>
+          }
+
+
+          {
+            files.length > 0 &&
+            <div className="attachmentList">
+
+              <h3>
+                New attachments
+              </h3>
+
+
+              {
+                files.map(
+                  (
+                    file,
+                    index
+                  ) => (
+
+                    <div
+                      className="attachmentItem"
+                      key={
+                        file.name +
+                        "-" +
+                        index
+                      }
+                    >
+
+                      <span className="fileIcon">
+                        File
+                      </span>
+
+
+                      <span>
+                        {file.name}
+                      </span>
+
+
+                      <button
+                        type="button"
+                        className="linkDanger"
+                        onClick={
+                          () => {
+
+                            removeNewFile(
+                              index
+                            );
+                          }
+                        }
+                      >
+                        Remove
+                      </button>
+
+                    </div>
+                  )
+                )
+              }
+
+            </div>
+          }
+
+        </div>
+      );
+    };
+
+
+  /* =====================================================
+     STEP 5
+     ===================================================== */
+
+  const renderReview =
+    ():
+    JSX.Element => {
+
+      return (
+
+        <div className="formPage">
+
+          <h2>
+            Review your request
+          </h2>
+
+
+          <p className="sectionIntro">
+            Check the information before submitting.
+          </p>
+
+
+          <dl className="summary">
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Student
+              </dt>
+
+              <dd className="reviewValue">
                 {
-                  r.Student
-                    ? (
-                        (r.Student.Title || "-") +
-                        (
-                          r.Student.EMail
-                            ? " (" + r.Student.EMail + ")"
-                            : ""
-                        )
+                  request.Student
+                    ? request.Student.Title
+                    : "-"
+                }
+              </dd>
+
+            </div>
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Student ID
+              </dt>
+
+              <dd className="reviewValue">
+                {
+                  request.Title ||
+                  "-"
+                }
+              </dd>
+
+            </div>
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Date of birth
+              </dt>
+
+              <dd className="reviewValue">
+                {
+                  request.DoB ||
+                  "-"
+                }
+              </dd>
+
+            </div>
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Level of study
+              </dt>
+
+              <dd className="reviewValue">
+                {
+                  request.LevelOfStudy ||
+                  "-"
+                }
+              </dd>
+
+            </div>
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Programme
+              </dt>
+
+              <dd className="reviewValue">
+                {
+                  request.Programme ||
+                  "-"
+                }
+              </dd>
+
+            </div>
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Absence dates
+              </dt>
+
+              <dd className="reviewValue">
+
+                {
+                  request.AbsenceStartDate ||
+                  "-"
+                }
+
+                {" to "}
+
+                {
+                  request.AbsenceEndDate ||
+                  "-"
+                }
+
+              </dd>
+
+            </div>
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Reason for absence
+              </dt>
+
+              <dd className="reviewValue">
+
+                {
+                  request.AbsenceReasons &&
+                  request.AbsenceReasons.length > 0
+                    ? request.AbsenceReasons.join(
+                        ", "
                       )
                     : "-"
                 }
-              </p>
 
-              <p>
-                <b>Student ID:</b>
-                {" "}
-                {r.Title}
-              </p>
-
-              <p>
-                <b>Date of Birth:</b>
-                {" "}
-                {r.DoB || "-"}
-              </p>
-
-              <p>
-                <b>Level of Study:</b>
-                {" "}
-                {r.LevelOfStudy}
-              </p>
-
-              <p>
-                <b>Programme:</b>
-                {" "}
-                {r.Programme}
-              </p>
-
-              <p>
-                <b>Admin:</b>
-                {" "}
-                {r.AdminLabel || "-"}
-              </p>
-
-              <button
-                type="button"
-                onClick={
-                  () =>
-                    setStep(1)
-                }
-              >
-                Change
-              </button>
+              </dd>
 
             </div>
 
 
-            <div className="summary">
+            <div className="reviewRow">
 
-              <h3>
-                Absence Details
-              </h3>
+              <dt className="reviewKey">
+                Travel outside UK
+              </dt>
 
-              <p>
-                <b>Start Date:</b>
-                {" "}
-                {r.AbsenceStartDate}
-              </p>
+              <dd className="reviewValue">
+                {
+                  request.TravelOutside ||
+                  "-"
+                }
+              </dd>
 
-              <p>
-                <b>End Date:</b>
-                {" "}
-                {r.AbsenceEndDate}
-              </p>
+            </div>
 
-              <p>
-                <b>Reason(s):</b>
-                {" "}
+
+            {
+              request.TravelOutside ===
+                "Yes" &&
+              <div className="reviewRow">
+
+                <dt className="reviewKey">
+                  Travel details
+                </dt>
+
+                <dd className="reviewValue">
+                  {
+                    request
+                      .TravelOutsideDetails ||
+                    "-"
+                  }
+                </dd>
+
+              </div>
+            }
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Confirmation letter
+              </dt>
+
+              <dd className="reviewValue">
+                {
+                  request
+                    .letterofconfirmationforauthorise ||
+                  "-"
+                }
+              </dd>
+
+            </div>
+
+
+            <div className="reviewRow">
+
+              <dt className="reviewKey">
+                Evidence
+              </dt>
+
+              <dd className="reviewValue">
+
                 {
                   (
-                    r.AbsenceReasons ||
+                    request.AttachmentFiles ||
                     []
-                  ).join(", ")
+                  ).filter(
+                    attachment =>
+                      deletedFiles.indexOf(
+                        attachment.FileName
+                      ) === -1
+                  ).length +
+                  files.length
                 }
-              </p>
 
+                {" file(s)"}
 
-              {
-                hasReason("Other") &&
-                (
-                  <p>
-                    <b>
-                      Other Details:
-                    </b>
-                    {" "}
-                    {
-                      r
-                        .ReasonOtherComments
-                    }
-                  </p>
-                )
-              }
-
-
-              <button
-                type="button"
-                onClick={
-                  () =>
-                    setStep(2)
-                }
-              >
-                Change
-              </button>
+              </dd>
 
             </div>
 
-
-            <div className="summary">
-
-              <h3>
-                Travel / Letter
-              </h3>
-
-              <p>
-                <b>
-                  Travelling Outside UK:
-                </b>
-                {" "}
-                {
-                  r.TravelOutside
-                }
-              </p>
+          </dl>
 
 
-              {
-                r.TravelOutside ===
-                  "Yes" &&
-                (
-                  <p>
-                    <b>
-                      Travel Details:
-                    </b>
-                    {" "}
-                    {
-                      r
-                        .TravelOutsideDetails
-                    }
-                  </p>
-                )
-              }
+          <div className="declarationBox">
+
+            By submitting this request, you confirm that the information provided is accurate and complete.
+
+          </div>
+
+        </div>
+      );
+    };
 
 
-              <p>
-                <b>
-                  Approval Letter:
-                </b>
-                {" "}
-                {
-                  r
-                    .letterofconfirmationforauthorise
-                }
-              </p>
+  /* =====================================================
+     RENDER STEP
+     ===================================================== */
 
+  const renderStep =
+    ():
+    JSX.Element => {
 
-              {
-                r
-                  .letterofconfirmationforauthorise ===
-                  "Yes" &&
-                (
-                  <p>
-                    <b>
-                      Letter Reason:
-                    </b>
-                    {" "}
-                    {
-                      r
-                        .Reasonforrequestingaletter
-                    }
-                  </p>
-                )
-              }
+      if (
+        step === 1
+      ) {
 
-
-              <button
-                type="button"
-                onClick={
-                  () =>
-                    setStep(3)
-                }
-              >
-                Change
-              </button>
-
-            </div>
-
-
-            <div className="summary">
-
-              <h3>
-                Supporting Evidence
-              </h3>
-
-              <p>
-                <b>Files:</b>
-                {" "}
-                {evidenceCount}
-              </p>
-
-
-              {
-                evidenceCount > 0 &&
-                (
-                  <ul>
-
-                    {
-                      existingActive.map(
-                        attachment => (
-
-                          <li
-                            key={
-                              attachment
-                                .FileName
-                            }
-                          >
-                            {
-                              attachment
-                                .FileName
-                            }
-                          </li>
-                        )
-                      )
-                    }
-
-
-                    {
-                      files.map(
-                        (
-                          file,
-                          index
-                        ) => (
-
-                          <li
-                            key={
-                              file.name +
-                              "-" +
-                              index
-                            }
-                          >
-                            {file.name}
-                          </li>
-                        )
-                      )
-                    }
-
-                  </ul>
-                )
-              }
-
-
-              <button
-                type="button"
-                onClick={
-                  () =>
-                    setStep(4)
-                }
-              >
-                Change
-              </button>
-
-            </div>
-
-
-            <div className="declarationBox">
-
-              <h3>
-                Before you submit
-              </h3>
-
-              <p>
-                Please check that the
-                information you have provided
-                is accurate and that you have
-                included any supporting
-                evidence required for your
-                request.
-              </p>
-
-            </div>
-
-          </section>
-        )
+        return renderStudentDetails();
       }
 
 
-      {/* =================================================
-          ACTIONS
-      ================================================= */}
+      if (
+        step === 2
+      ) {
+
+        return renderAbsenceDetails();
+      }
+
+
+      if (
+        step === 3
+      ) {
+
+        return renderTravelLetter();
+      }
+
+
+      if (
+        step === 4
+      ) {
+
+        return renderEvidence();
+      }
+
+
+      return renderReview();
+    };
+
+
+  return (
+
+    <div className="studentRequestForm">
+
+      <div className="aaHeader">
+
+        <div>
+
+          <h1>
+            Authorised Absence Request
+          </h1>
+
+
+          {
+            request.Id &&
+            <p>
+              Request #{request.Id}
+            </p>
+          }
+
+        </div>
+
+
+        <span className="pill">
+          {
+            request.Status ||
+            "Draft"
+          }
+        </span>
+
+      </div>
+
+
+      {
+        renderStepper()
+      }
+
+
+      {
+        pageError &&
+        <div
+          className="errorSummary"
+          role="alert"
+        >
+
+          <strong>
+            There is a problem
+          </strong>
+
+          <p>
+            {pageError}
+          </p>
+
+        </div>
+      }
+
+
+      {
+        errors.length > 0 &&
+        <div
+          className="errorSummary"
+          role="alert"
+        >
+
+          <strong>
+            Check the information entered
+          </strong>
+
+          <ul>
+
+            {
+              errors.map(
+                (
+                  error,
+                  index
+                ) => (
+
+                  <li
+                    key={
+                      error.field +
+                      "-" +
+                      index
+                    }
+                  >
+                    {error.message}
+                  </li>
+                )
+              )
+            }
+
+          </ul>
+
+        </div>
+      }
+
+
+      {
+        renderStep()
+      }
+
 
       <div className="actions">
 
@@ -1992,26 +2998,17 @@ React.FC<Props> = (p) => {
           className="secondaryButton"
           disabled={saving}
           onClick={
-            p.onCancel
+            back
           }
         >
-          Cancel
+
+          {
+            step === 1
+              ? "Cancel"
+              : "Back"
+          }
+
         </button>
-
-
-        {
-          step > 1 &&
-          (
-            <button
-              type="button"
-              className="secondaryButton"
-              disabled={saving}
-              onClick={back}
-            >
-              Back
-            </button>
-          )
-        }
 
 
         <button
@@ -2020,18 +3017,20 @@ React.FC<Props> = (p) => {
           disabled={saving}
           onClick={
             () => {
-              saveDraft().catch(
-                console.error
-              );
+
+              void saveDraft();
             }
           }
         >
           {
             saving
               ? "Saving..."
-              : p.adminMode
-                ? "Save Changes"
-                : "Save Draft"
+              : (
+                  props.adminMode &&
+                  request.Id
+                    ? "Save changes"
+                    : "Save draft"
+                )
           }
         </button>
 
@@ -2043,26 +3042,31 @@ React.FC<Props> = (p) => {
                 type="button"
                 className="primary"
                 disabled={saving}
-                onClick={next}
+                onClick={
+                  next
+                }
               >
                 Continue
               </button>
             )
             : (
-              p.adminMode && p.initial.Id
-                ? null
-                : (
-                  <button
-                    type="button"
-                    className="primary"
-                    disabled={saving}
-                    onClick={() => {
-                      submitRequest().catch(console.error);
-                    }}
-                  >
-                    {saving ? "Submitting..." : "Submit Request"}
-                  </button>
-                )
+              <button
+                type="button"
+                className="primary"
+                disabled={saving}
+                onClick={
+                  () => {
+
+                    void submit();
+                  }
+                }
+              >
+                {
+                  saving
+                    ? "Submitting..."
+                    : "Submit request"
+                }
+              </button>
             )
         }
 
@@ -2071,3 +3075,6 @@ React.FC<Props> = (p) => {
     </div>
   );
 };
+
+
+export default StudentRequestForm;
