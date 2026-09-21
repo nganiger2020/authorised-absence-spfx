@@ -1074,6 +1074,100 @@ export class RequestService {
 
 
   /* =====================================================
+     ABSENCE REASONS CHOICES
+     ===================================================== */
+
+  public async getAbsenceReasonsChoices():
+  Promise<string[]> {
+
+    try {
+
+      const field =
+        await this.requestList.fields
+          .getByInternalNameOrTitle(
+            "AbsenceReasons"
+          )();
+
+      const fieldInfo =
+        field as unknown as {
+          Choices?: string[];
+          TypeAsString?: string;
+        };
+
+      if (
+        fieldInfo.TypeAsString &&
+        fieldInfo.TypeAsString !== "MultiChoice" &&
+        fieldInfo.TypeAsString !== "Choice"
+      ) {
+        throw new Error(
+          "AbsenceReasons must be a SharePoint Choice or MultiChoice field."
+        );
+      }
+
+      return fieldInfo.Choices
+        ? fieldInfo.Choices.slice()
+        : [];
+
+    } catch (error) {
+
+      console.error(
+        "Unable to load AbsenceReasons choices.",
+        error
+      );
+
+      throw error;
+    }
+  }
+
+
+  /* =====================================================
+     ABSENCE REASONS CONFIRM CHOICES
+     ===================================================== */
+
+  public async getAbsenceReasonsConfirmChoices():
+  Promise<string[]> {
+
+    try {
+
+      const field =
+        await this.requestList.fields
+          .getByInternalNameOrTitle(
+            "AbsenceReasonsConfirm"
+          )();
+
+      const fieldInfo =
+        field as unknown as {
+          Choices?: string[];
+          TypeAsString?: string;
+        };
+
+      if (
+        fieldInfo.TypeAsString &&
+        fieldInfo.TypeAsString !== "MultiChoice" &&
+        fieldInfo.TypeAsString !== "Choice"
+      ) {
+        throw new Error(
+          "AbsenceReasonsConfirm must be a SharePoint Choice or MultiChoice field."
+        );
+      }
+
+      return fieldInfo.Choices
+        ? fieldInfo.Choices.slice()
+        : [];
+
+    } catch (error) {
+
+      console.error(
+        "Unable to load AbsenceReasonsConfirm choices.",
+        error
+      );
+
+      throw error;
+    }
+  }
+
+
+  /* =====================================================
      ADMIN MANAGED METADATA
      ===================================================== */
 
@@ -1920,7 +2014,7 @@ export class RequestService {
           "Approval",
 
         Status:
-          "Pending Approval"
+          "Under Review"
       };
 
 
@@ -2205,7 +2299,17 @@ export class RequestService {
 
         Status:
           request.Status ||
-          "Under Review"
+          "Under Review",
+
+        AbsenceReasonsConfirm:
+          request.AbsenceReasonsConfirm
+            ? request.AbsenceReasonsConfirm.slice()
+            : [],
+
+        ReasonConfOtherComments:
+          this.nullIfEmpty(
+            request.ReasonConfOtherComments
+          )
       };
 
     if (

@@ -16,9 +16,7 @@ import {
   Dashboard
 } from "./dashboards/Dashboard";
 
-import {
-  StudentRequestForm
-} from "./forms/StudentRequestForm";
+
 
 import {
   ReviewForm
@@ -27,6 +25,7 @@ import {
 import {
   IAdminTermOption
 } from "../controls/AdminManagedMetadata";
+import StudentRequestForm from "./forms/StudentRequestForm";
 
 
 /* =========================================================
@@ -83,6 +82,12 @@ React.FC<Props> = (props) => {
   const [adminOptionsLoading, setAdminOptionsLoading] =
     React.useState<boolean>(false);
 
+  const [absenceReasonOptions, setAbsenceReasonOptions] =
+    React.useState<string[]>([]);
+
+  const [absenceReasonConfirmOptions, setAbsenceReasonConfirmOptions] =
+    React.useState<string[]>([]);
+
 
   /* =====================================================
      ERROR MESSAGE
@@ -127,6 +132,22 @@ React.FC<Props> = (props) => {
             resolvedRole,
             user.Id
           );
+
+        try {
+          const studentReasonChoices = await props.service.getAbsenceReasonsChoices();
+          setAbsenceReasonOptions(studentReasonChoices || []);
+        } catch (absenceReasonError) {
+          console.error("Unable to load AbsenceReasons choices.", absenceReasonError);
+          setAbsenceReasonOptions([]);
+        }
+
+        try {
+          const reviewerReasonChoices = await props.service.getAbsenceReasonsConfirmChoices();
+          setAbsenceReasonConfirmOptions(reviewerReasonChoices || []);
+        } catch (absenceReasonConfirmError) {
+          console.error("Unable to load AbsenceReasonsConfirm choices.", absenceReasonConfirmError);
+          setAbsenceReasonConfirmOptions([]);
+        }
 
         if (resolvedRole === "Admin") {
           const availableUsers = await props.service.getSiteUsers();
@@ -750,28 +771,44 @@ React.FC<Props> = (props) => {
 
   const approve =
     async (
-      comments: string
+      comments: string,
+      absenceReasonsConfirm: string[],
+      reasonConfOtherComments: string,
+      signatoryId?: number
     ): Promise<void> => {
 
       if (!selected) {
         return;
       }
 
-
-      /*
-       * Capture the current request
-       * before any awaited operation.
-       */
-
-      const requestToApprove:
-        IRequest = {
-          ...selected
-        };
-
+      const requestToApprove: IRequest = {
+        ...selected,
+        AbsenceReasonsConfirm: absenceReasonsConfirm
+          ? absenceReasonsConfirm.slice()
+          : [],
+        ReasonConfOtherComments: reasonConfOtherComments || "",
+        SignatoryId: signatoryId || selected.SignatoryId
+      };
 
       try {
-
         setError("");
+
+        if (
+          requestToApprove.Id &&
+          signatoryId &&
+          signatoryId !== selected.SignatoryId
+        ) {
+          await props.service.assignSignatory(
+            requestToApprove.Id,
+            signatoryId
+          );
+        }
+
+        // Persist the approver's final reasons/comments before completion.
+        await props.service.saveReview(
+          requestToApprove,
+          comments
+        );
 
         await props.service.approve(
           requestToApprove,
@@ -781,18 +818,14 @@ React.FC<Props> = (props) => {
         await backToDashboard();
 
       } catch (err) {
-
-        console.error(
-          "Approval failed.",
-          err
-        );
-
+        console.error("Approval failed.", err);
         setError(
           getErrorMessage(
             err,
             "Unable to approve the request."
           )
         );
+        throw err;
       }
     };
 
@@ -803,23 +836,43 @@ React.FC<Props> = (props) => {
 
   const reject =
     async (
-      comments: string
+      comments: string,
+      absenceReasonsConfirm: string[],
+      reasonConfOtherComments: string,
+      signatoryId?: number
     ): Promise<void> => {
 
       if (!selected) {
         return;
       }
 
-
-      const requestToReject:
-        IRequest = {
-          ...selected
-        };
-
+      const requestToReject: IRequest = {
+        ...selected,
+        AbsenceReasonsConfirm: absenceReasonsConfirm
+          ? absenceReasonsConfirm.slice()
+          : [],
+        ReasonConfOtherComments: reasonConfOtherComments || "",
+        SignatoryId: signatoryId || selected.SignatoryId
+      };
 
       try {
-
         setError("");
+
+        if (
+          requestToReject.Id &&
+          signatoryId &&
+          signatoryId !== selected.SignatoryId
+        ) {
+          await props.service.assignSignatory(
+            requestToReject.Id,
+            signatoryId
+          );
+        }
+
+        await props.service.saveReview(
+          requestToReject,
+          comments
+        );
 
         await props.service.reject(
           requestToReject,
@@ -829,68 +882,123 @@ React.FC<Props> = (props) => {
         await backToDashboard();
 
       } catch (err) {
-
-        console.error(
-          "Rejection failed.",
-          err
-        );
-
+        console.error("Rejection failed.", err);
         setError(
           getErrorMessage(
             err,
             "Unable to reject the request."
           )
         );
+        throw err;
       }
     };
 
 
-  const saveReviewForLater = async (comments: string): Promise<void> => {
-    if (!selected) { return; }
-    try {
-      setError("");
-      await props.service.saveReview({ ...selected }, comments);
-      await backToDashboard();
-    } catch (err) {
-      setError(getErrorMessage(err, "Unable to save the review."));
-      throw err;
-    }
-  };
+  /* =====================================================
+     SAVE REVIEW FOR LATER
+     ===================================================== */
 
-  const assignSignatory = async (signatoryId: number): Promise<void> => {
-    if (!selected || !selected.Id || role !== "Admin") { return; }
-    await props.service.assignSignatory(selected.Id, signatoryId);
-    const updated = await props.service.get(selected.Id);
-    setSelected(updated);
-  };
+  const saveReviewForLater =
+    async (
+      comments: string,
+      absenceReasonsConfirm: string[],
+      reasonConfOtherComments: string,
+      signatoryId?: number
+    ): Promise<void> => {
 
-  const changeAdministrator = async (
-    label?: string,
-    termGuid?: string
-  ): Promise<void> => {
+      if (!selected) {
+        return;
+      }
 
-    if (!selected || !selected.Id || role !== "Admin") {
-      return;
-    }
+      const requestToSave: IRequest = {
+        ...selected,
+        Stage: "Signatory",
+        Status: "Under Review",
+        AbsenceReasonsConfirm: absenceReasonsConfirm
+          ? absenceReasonsConfirm.slice()
+          : [],
+        ReasonConfOtherComments: reasonConfOtherComments || "",
+        SignatoryId: signatoryId || selected.SignatoryId
+      };
 
-    const adminLabel = label ? label.trim() : "";
-    const adminTermGuid = termGuid ? termGuid.trim() : "";
+      try {
+        setError("");
 
-    if (!adminLabel || !adminTermGuid) {
-      return;
-    }
+        if (
+          requestToSave.Id &&
+          signatoryId &&
+          signatoryId !== selected.SignatoryId
+        ) {
+          await props.service.assignSignatory(
+            requestToSave.Id,
+            signatoryId
+          );
+        }
 
-    await props.service.assignAdministrator(
-      selected.Id,
-      adminLabel,
-      adminTermGuid
-    );
+        await props.service.saveReview(
+          requestToSave,
+          comments
+        );
 
-    const updated =
-      await props.service.get(selected.Id);
+        await backToDashboard();
 
-    setSelected(updated);
-  };
+      } catch (err) {
+        console.error("Unable to save review.", err);
+        setError(
+          getErrorMessage(
+            err,
+            "Unable to save the review."
+          )
+        );
+        throw err;
+      }
+    };
+
+
+  /* =====================================================
+     CHANGE ADMINISTRATOR
+     ===================================================== */
+
+  const changeAdministrator =
+    async (
+      label?: string,
+      termGuid?: string
+    ): Promise<void> => {
+
+      if (!selected || !selected.Id || role !== "Admin") {
+        return;
+      }
+
+      const adminLabel = label ? label.trim() : "";
+      const adminTermGuid = termGuid ? termGuid.trim() : "";
+
+      if (!adminLabel || !adminTermGuid) {
+        return;
+      }
+
+      try {
+        setError("");
+
+        await props.service.assignAdministrator(
+          selected.Id,
+          adminLabel,
+          adminTermGuid
+        );
+
+        const updated = await props.service.get(selected.Id);
+        setSelected(updated);
+
+      } catch (err) {
+        console.error("Unable to change administrator.", err);
+        setError(
+          getErrorMessage(
+            err,
+            "Unable to change the administrator."
+          )
+        );
+        throw err;
+      }
+    };
 
 
   /* =====================================================
@@ -1700,6 +1808,7 @@ React.FC<Props> = (props) => {
         userOptions={userOptions}
         adminOptions={adminOptions}
         adminOptionsLoading={adminOptionsLoading}
+        absenceReasonOptions={absenceReasonOptions}
         onSearchUsers={searchUsers}
         onResolveUser={resolveUser}
         onSaveDraft={
@@ -1739,39 +1848,62 @@ React.FC<Props> = (props) => {
 
     content = (
 
-      <ReviewForm
-        request={selected}
-        adminMode={role === "Admin"}
-        userOptions={userOptions}
-        adminOptions={adminOptions}
-        adminOptionsLoading={adminOptionsLoading}
-        onSearchUsers={searchUsers}
-        onResolveUser={resolveUser}
-        onSaveForLater={saveReviewForLater}
-        onAssignSignatory={assignSignatory}
-        onAdminChange={changeAdministrator}
-        onBack={
-          () => {
+   <ReviewForm
+  request={selected}
+  adminMode={role === "Admin"}
 
-            backToDashboard()
-              .catch(
-                (err: unknown) => {
+  userOptions={userOptions}
 
-                  console.error(
-                    "Unable to return to dashboard.",
-                    err
-                  );
-                }
-              );
+  adminOptions={adminOptions}
+
+  adminOptionsLoading={
+    adminOptionsLoading
+  }
+
+  absenceReasonOptions={
+    absenceReasonConfirmOptions
+  }
+
+  onSearchUsers={
+    searchUsers
+  }
+
+  onResolveUser={
+    resolveUser
+  }
+
+  onSaveForLater={
+    saveReviewForLater
+  }
+
+  onAdminChange={
+    changeAdministrator
+  }
+
+  onBack={
+    () => {
+
+      backToDashboard()
+        .catch(
+          (err: unknown) => {
+
+            console.error(
+              "Unable to return to dashboard.",
+              err
+            );
           }
-        }
-        onApprove={
-          approve
-        }
-        onReject={
-          reject
-        }
-      />
+        );
+    }
+  }
+
+  onApprove={
+    approve
+  }
+
+  onReject={
+    reject
+  }
+/>
     );
   }
 
@@ -1827,7 +1959,10 @@ React.FC<Props> = (props) => {
                   Welcome, <strong>{userName}</strong>
                 </span>
 
-                <span className="welcomeUserRole" style={{display:"none"}}>
+                <span
+                  className="welcomeUserRole"
+                  style={{ display: "none" }}
+                >
                   {roleLabel()}
                 </span>
               </div>
@@ -1844,13 +1979,6 @@ React.FC<Props> = (props) => {
          ================================================= */}
 
       <main className="appContent">
-
-
-        {/* ===============================================
-            USER CONTEXT
-           =============================================== */}
-
-
 
 
         {/* ===============================================
