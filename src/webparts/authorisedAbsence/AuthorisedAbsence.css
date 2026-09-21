@@ -147,10 +147,13 @@
 .formPage input[type="text"],
 .formPage input[type="date"],
 .formPage input[type="email"],
+.formPage input[type="number"],
 .formPage select,
 .formPage textarea,
 .review input[type="text"],
 .review input[type="date"],
+.review input[type="email"],
+.review input[type="number"],
 .review select,
 .review textarea,
 .formControl {
@@ -188,7 +191,10 @@
 
 .formPage input:disabled,
 .formPage select:disabled,
-.formPage textarea:disabled {
+.formPage textarea:disabled,
+.review input:disabled,
+.review select:disabled,
+.review textarea:disabled {
   background: #eeeeee;
   color: #666666;
   cursor: not-allowed;
@@ -308,6 +314,13 @@
   font-weight: 600;
 }
 
+.errorMessage {
+  margin-top: 7px;
+  color: #b10e1e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .notice {
   margin: 20px 0;
   padding: 16px 18px;
@@ -359,7 +372,9 @@ button {
   outline-offset: 2px;
 }
 
-.primary:disabled {
+.primary:disabled,
+.secondaryButton:disabled,
+.danger:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -386,10 +401,17 @@ button {
   min-height: 42px;
   padding: 9px 18px;
   border: 2px solid #b10e1e;
+  border-radius: 2px;
   background: #b10e1e;
   color: #ffffff;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.danger:hover {
+  background: #8f0b18;
+  border-color: #8f0b18;
 }
 
 .linkDanger {
@@ -420,7 +442,7 @@ button {
 
 
 /* =========================================================
-   REVIEW / SUMMARY CARDS
+   SUMMARY CARDS
    ========================================================= */
 
 .summary {
@@ -476,12 +498,14 @@ button {
   line-height: 1.5;
 }
 
-.formPage a {
+.formPage a,
+.review a {
   color: #5b0e2d;
   font-weight: 600;
 }
 
-.formPage a:hover {
+.formPage a:hover,
+.review a:hover {
   text-decoration-thickness: 2px;
 }
 
@@ -532,6 +556,11 @@ button {
   border-color: #8b1e41;
 }
 
+.card:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
 .card span {
   display: block;
   margin-bottom: 7px;
@@ -567,10 +596,12 @@ button {
 
 .toolbar input {
   flex: 1;
+  min-width: 0;
   min-height: 42px;
   padding: 9px 12px;
   border: 2px solid #555555;
   background: #ffffff;
+  color: #1f1f1f;
   font-size: 15px;
 }
 
@@ -584,13 +615,66 @@ button {
   cursor: pointer;
 }
 
+.toolbar button:hover {
+  background: #f7f7f7;
+}
+
 
 /* =========================================================
-   TABLE
+   RESULT TOOLBAR
+   ========================================================= */
+
+.resultToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0 12px;
+  flex-wrap: wrap;
+}
+
+.resultSummary {
+  color: #333333;
+  font-size: 16px;
+}
+
+.pageSizeControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageSizeControl label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pageSizeControl select {
+  min-width: 70px;
+  min-height: 38px;
+  padding: 7px 28px 7px 9px;
+  border: 1px solid #767676;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font: inherit;
+}
+
+.pageSizeControl select:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 1px;
+}
+
+
+/* =========================================================
+   DASHBOARD TABLE
    ========================================================= */
 
 .tableWrap {
+  position: relative;
   overflow-x: auto;
+  overflow-y: visible;
   margin-top: 20px;
   border: 1px solid #d1d1d1;
   background: #ffffff;
@@ -607,6 +691,7 @@ button {
   background: #f0f0f0;
   color: #333333;
   font-size: 14px;
+  font-weight: 700;
   text-align: left;
   white-space: nowrap;
 }
@@ -623,19 +708,77 @@ button {
   background: #fafafa;
 }
 
+.tableWrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/*
+ * Default table button.
+ * Action dropdown buttons below use more specific selectors
+ * so this styling does not interfere with the three-dot menu.
+ */
 .tableWrap td button {
   margin-right: 6px;
   padding: 6px 11px;
   border: 1px solid #555555;
+  border-radius: 2px;
   background: #ffffff;
   color: #5b0e2d;
   font-weight: 600;
   cursor: pointer;
 }
 
+.tableWrap td button:hover {
+  background: #f7eef2;
+}
+
+.tableWrap td button:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 1px;
+}
+
 
 /* =========================================================
-   STATUS
+   TABLE SORTING
+   ========================================================= */
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sortButton:hover {
+  text-decoration: underline;
+}
+
+.sortButton:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 3px;
+}
+
+.sortIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+
+/* =========================================================
+   STATUS PILLS
    ========================================================= */
 
 .pill {
@@ -648,6 +791,7 @@ button {
   font-size: 12px;
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
 }
 
 .statusDraft {
@@ -677,6 +821,74 @@ button {
 
 
 /* =========================================================
+   PAGINATION
+   ========================================================= */
+
+.paginationSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #d8d8d8;
+  flex-wrap: wrap;
+}
+
+.paginationSummary {
+  color: #444444;
+  font-size: 15px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.paginationButton {
+  min-width: 38px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #333333;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.paginationButton:hover:not(:disabled):not(.active) {
+  background: #f5f5f5;
+}
+
+.paginationButton:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 1px;
+}
+
+.paginationButton.active {
+  border-color: #5b0e2d;
+  background: #5b0e2d;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.paginationButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.paginationEllipsis {
+  min-width: 24px;
+  text-align: center;
+}
+
+
+/* =========================================================
    REVIEW FORM
    ========================================================= */
 
@@ -702,18 +914,686 @@ button {
   border-bottom: 1px solid #eeeeee;
 }
 
+.reviewRow:last-child {
+  border-bottom: 0;
+}
+
 .reviewKey {
   font-weight: 700;
   color: #444444;
 }
 
 .reviewValue {
+  min-width: 0;
   color: #222222;
+  overflow-wrap: anywhere;
 }
 
 
 /* =========================================================
-   RESPONSIVE
+   ADMIN OPERATIONS
+   ========================================================= */
+
+.adminSection {
+  border-left: 5px solid #5b0e2d;
+  background: #fbf7f9;
+}
+
+.adminSection select,
+.formGroup select {
+  width: 100%;
+  max-width: 700px;
+  min-height: 44px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  margin-bottom: 12px;
+  border: 2px solid #4c4c4c;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font: inherit;
+}
+
+.adminSection select:focus,
+.formGroup select:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 0;
+  border-color: #0b0c0c;
+}
+
+
+/* =========================================================
+   PEOPLE PICKER
+   ========================================================= */
+
+.peoplePicker {
+  position: relative;
+  width: 100%;
+  max-width: 700px;
+}
+
+.peoplePickerControl {
+  position: relative;
+  width: 100%;
+  max-width: 700px;
+}
+
+.formPage .peoplePickerControl input[type="text"] {
+  width: 100%;
+  max-width: 700px;
+  min-height: 48px;
+  margin-top: 7px;
+  padding: 10px 90px 10px 12px;
+  border: 2px solid #555555;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+}
+
+.formPage .peoplePickerControl input[type="text"]:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 0;
+  border-color: #1f1f1f;
+}
+
+.formPage .peoplePickerControl input[type="text"]::placeholder {
+  color: #777777;
+  opacity: 1;
+}
+
+
+/* =========================================================
+   PEOPLE PICKER CLEAR BUTTON
+   ========================================================= */
+
+.peoplePickerClear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-40%);
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #5b0e2d;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.peoplePickerClear:hover {
+  background: #f7eef2;
+  text-decoration: underline;
+}
+
+.peoplePickerClear:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 1px;
+}
+
+
+/* =========================================================
+   PEOPLE PICKER SEARCH RESULTS
+   ========================================================= */
+
+.peoplePickerResults {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  width: 100%;
+  max-width: 700px;
+  max-height: 300px;
+  margin-top: 4px;
+  overflow-y: auto;
+  border: 1px solid #b1b1b1;
+  border-top: 3px solid #8b1e41;
+  border-radius: 2px;
+  background: #ffffff;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.15);
+}
+
+.peoplePickerOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 1px solid #e2e2e2;
+  background: #ffffff;
+  color: #222222;
+  font-family: Arial, Helvetica, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.peoplePickerOption:last-child {
+  border-bottom: 0;
+}
+
+.peoplePickerOption:hover {
+  background: #f7eef2;
+}
+
+.peoplePickerOption:focus {
+  position: relative;
+  outline: 3px solid #ffbf47;
+  outline-offset: -3px;
+  background: #f7eef2;
+}
+
+
+/* =========================================================
+   PEOPLE PICKER AVATAR
+   ========================================================= */
+
+.peoplePickerAvatar {
+  display: flex;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #5b0e2d;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   PEOPLE PICKER PERSON DETAILS
+   ========================================================= */
+
+.peoplePickerPerson {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.peoplePickerPerson strong {
+  display: block;
+  overflow: hidden;
+  color: #222222;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peoplePickerPerson span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: #626262;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peoplePickerEmpty {
+  padding: 15px;
+  background: #ffffff;
+  color: #626262;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   SELECTED PERSON
+   ========================================================= */
+
+.peoplePickerSelected {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  max-width: 700px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #cccccc;
+  border-left: 4px solid #5b0e2d;
+  border-radius: 2px;
+  background: #fbf7f9;
+}
+
+.peoplePickerSelected .peoplePickerAvatar {
+  flex-basis: 36px;
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+}
+
+.peoplePickerSelected > span:last-child {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.peoplePickerSelected strong {
+  display: block;
+  color: #222222;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.peoplePickerEmail {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: #626262;
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peoplePicker .hint {
+  margin: 6px 0 0;
+  color: #626262;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.peoplePicker .errorMessage {
+  margin-top: 7px;
+  color: #b10e1e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   CONSISTENT FORM WIDTHS
+   ========================================================= */
+
+.formGroup input[type="text"],
+.formGroup input[type="date"],
+.formGroup input[type="email"],
+.formGroup input[type="number"],
+.formGroup textarea,
+.formGroup select {
+  width: 100%;
+  max-width: 700px;
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   SIGNED-IN USER BANNER
+   ========================================================= */
+
+.signedInBanner,
+.userContext {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 24px 0;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #f3f2f1;
+  border-left: 5px solid #5b0e2d;
+  color: #222222;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.signedInBannerText {
+  display: inline-block;
+}
+
+.signedInBannerText strong,
+.userContext strong {
+  font-weight: 700;
+}
+
+.signedInBannerSeparator {
+  font-weight: 700;
+}
+
+.signedInBannerRole,
+.userRole {
+  display: inline-block;
+  padding: 3px 10px;
+  background: #5b0e2d;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 3px;
+}
+
+
+/* =========================================================
+   LOADING
+   ========================================================= */
+
+.loadingPanel {
+  margin: 20px 0;
+  padding: 18px;
+  border-left: 5px solid #5b0e2d;
+  background: #ffffff;
+  color: #333333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   EMPTY TABLE / EMPTY STATE
+   ========================================================= */
+
+.emptyState {
+  padding: 30px 20px;
+  background: #ffffff;
+  color: #555555;
+  text-align: center;
+}
+
+.tableWrap td.emptyState,
+.tableWrap .emptyState {
+  padding: 30px 20px;
+  text-align: center;
+}
+
+
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
+
+.authorisedAbsenceApp a:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+.authorisedAbsenceApp button:disabled {
+  cursor: not-allowed;
+}
+
+.authorisedAbsenceApp input::placeholder,
+.authorisedAbsenceApp textarea::placeholder {
+  color: #707070;
+  opacity: 1;
+}
+
+
+/* =========================================================
+   REQUEST ACTIONS - THREE DOT MENU
+   ========================================================= */
+
+.actionsHeader {
+  width: 70px;
+  min-width: 70px;
+  text-align: center !important;
+}
+
+.actionsCell {
+  position: relative;
+  overflow: visible !important;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.requestActions {
+  position: relative;
+  display: inline-block;
+}
+
+
+/* =========================================================
+   THREE DOT BUTTON
+   ========================================================= */
+
+/*
+ * Specific selector intentionally overrides
+ * the generic .tableWrap td button styles.
+ */
+
+.tableWrap td .requestActionsButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+
+  margin: 0;
+  padding: 0;
+
+  border: 1px solid transparent;
+  border-radius: 4px;
+
+  background: transparent;
+  color: #505a5f;
+
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.tableWrap td .requestActionsButton:hover {
+  border-color: #d5d5d5;
+  background: #f3f3f3;
+  color: #5b0e2d;
+}
+
+.tableWrap td .requestActionsButtonOpen {
+  border-color: #b1b4b6;
+  background: #f3f3f3;
+  color: #5b0e2d;
+}
+
+.tableWrap td .requestActionsButton:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+
+/* THREE VERTICAL DOTS */
+
+.requestActionsDots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 100%;
+
+  color: inherit;
+
+  font-size: 26px;
+  font-weight: 700;
+
+  line-height: 1;
+
+  transform: translateY(-2px);
+}
+
+
+/* =========================================================
+   ACTION DROPDOWN MENU
+   ========================================================= */
+
+.requestActionsMenu {
+  position: absolute;
+
+  top: calc(100% + 6px);
+  right: 0;
+
+  z-index: 9999;
+
+  width: 200px;
+
+  padding: 7px 0;
+
+  border: 1px solid #dedede;
+  border-radius: 6px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+
+  text-align: left;
+}
+
+
+/* =========================================================
+   ACTION MENU ITEM
+   ========================================================= */
+
+.tableWrap td .requestActionsItem {
+  display: flex;
+  align-items: center;
+
+  gap: 15px;
+
+  width: 100%;
+  min-height: 50px;
+
+  margin: 0;
+  padding: 10px 17px;
+
+  border: 0;
+  border-radius: 0;
+
+  background: #ffffff;
+  color: #242424;
+
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+
+  line-height: 20px;
+
+  text-align: left;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.tableWrap td .requestActionsItem:hover {
+  background: #f5f5f5;
+  color: #242424;
+}
+
+.tableWrap td .requestActionsItem:focus {
+  position: relative;
+  z-index: 1;
+
+  outline: 3px solid #ffbf47;
+  outline-offset: -3px;
+
+  background: #f5f5f5;
+}
+
+
+/* =========================================================
+   ACTION MENU ICON
+   ========================================================= */
+
+.requestActionsIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 26px;
+
+  width: 26px;
+  height: 26px;
+
+  color: #6f6f6f;
+}
+
+.requestActionsIcon svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+}
+
+
+/* =========================================================
+   ACTION MENU LABEL
+   ========================================================= */
+
+.requestActionsLabel {
+  display: block;
+  flex: 1;
+
+  color: inherit;
+
+  font-size: 15px;
+  font-weight: 400;
+
+  line-height: 22px;
+}
+
+
+/* =========================================================
+   ACTION MENU DIVIDER
+   ========================================================= */
+
+.requestActionsDivider {
+  height: 1px;
+
+  margin: 5px 0;
+
+  background: #e1e1e1;
+}
+
+
+/* =========================================================
+   DELETE ACTION
+   ========================================================= */
+
+.tableWrap td .requestActionsDelete {
+  color: #b10e1e;
+}
+
+.requestActionsDelete .requestActionsIcon {
+  color: #b10e1e;
+}
+
+.tableWrap td .requestActionsDelete:hover {
+  background: #fff3f3;
+  color: #b10e1e;
+}
+
+
+/* =========================================================
+   RESPONSIVE - TABLET / MOBILE
    ========================================================= */
 
 @media screen and (max-width: 768px) {
@@ -765,6 +1645,11 @@ button {
     flex-direction: column;
   }
 
+  .aaHeader .primary,
+  .aaHeader .secondaryButton {
+    width: 100%;
+  }
+
   .cards {
     grid-template-columns: 1fr 1fr;
   }
@@ -772,6 +1657,20 @@ button {
   .toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .toolbar input,
+  .toolbar button {
+    width: 100%;
+  }
+
+  .resultToolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pageSizeControl {
+    width: 100%;
   }
 
   .summary {
@@ -796,378 +1695,15 @@ button {
     grid-template-columns: 1fr;
     gap: 4px;
   }
-}
-/* =========================================================
-   ADMIN OPERATIONS
-   ========================================================= */
-.adminSection {
-  border-left: 5px solid #5b0e2d;
-  background: #fbf7f9;
-}
 
-.adminSection select,
-.formGroup select {
-  width: 100%;
-  max-width: 720px;
-  min-height: 44px;
-  padding: 8px 10px;
-  margin-top: 6px;
-  margin-bottom: 12px;
-  border: 2px solid #4c4c4c;
-  background: #fff;
-  font: inherit;
-}
-
-.adminSection select:focus,
-.formGroup select:focus {
-  outline: 3px solid #ffbf47;
-  outline-offset: 0;
-  border-color: #0b0c0c;
-}
-
-
-/* =========================================================
-   PEOPLE PICKER
-   ========================================================= */
-
-.peoplePicker {
-  position: relative;
-  width: 100%;
-  max-width: 700px;
-}
-
-
-/* INPUT + CLEAR BUTTON */
-
-.peoplePickerControl {
-  position: relative;
-  width: 100%;
-  max-width: 700px;
-}
-
-.formPage .peoplePickerControl input[type="text"] {
-  width: 100%;
-  max-width: 700px;
-  min-height: 48px;
-  margin-top: 7px;
-  padding: 10px 90px 10px 12px;
-
-  border: 2px solid #555555;
-  border-radius: 2px;
-
-  background: #ffffff;
-  color: #1f1f1f;
-
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 16px;
-}
-
-.formPage .peoplePickerControl input[type="text"]:focus {
-  outline: 3px solid #ffbf47;
-  outline-offset: 0;
-  border-color: #1f1f1f;
-}
-
-.formPage .peoplePickerControl input[type="text"]::placeholder {
-  color: #777777;
-  opacity: 1;
-}
-
-
-/* CLEAR */
-
-.peoplePickerClear {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-
-  transform: translateY(-40%);
-
-  min-height: 32px;
-  padding: 4px 10px;
-
-  border: 0;
-  border-radius: 2px;
-
-  background: transparent;
-  color: #5b0e2d;
-
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-
-  cursor: pointer;
-}
-
-.peoplePickerClear:hover {
-  background: #f7eef2;
-  text-decoration: underline;
-}
-
-.peoplePickerClear:focus {
-  outline: 3px solid #ffbf47;
-  outline-offset: 1px;
-}
-
-
-/* =========================================================
-   SEARCH RESULTS
-   ========================================================= */
-
-.peoplePickerResults {
-  position: absolute;
-
-  left: 0;
-  right: 0;
-
-  z-index: 1000;
-
-  width: 100%;
-  max-width: 700px;
-  max-height: 300px;
-
-  margin-top: 4px;
-
-  overflow-y: auto;
-
-  border: 1px solid #b1b1b1;
-  border-top: 3px solid #8b1e41;
-  border-radius: 2px;
-
-  background: #ffffff;
-
-  box-shadow:
-    0 5px 14px rgba(0, 0, 0, 0.15);
-}
-
-
-/* SEARCH RESULT ROW */
-
-.peoplePickerOption {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  width: 100%;
-
-  padding: 11px 14px;
-
-  border: 0;
-  border-bottom: 1px solid #e2e2e2;
-
-  background: #ffffff;
-  color: #222222;
-
-  font-family: Arial, Helvetica, sans-serif;
-  text-align: left;
-
-  cursor: pointer;
-}
-
-.peoplePickerOption:last-child {
-  border-bottom: 0;
-}
-
-.peoplePickerOption:hover {
-  background: #f7eef2;
-}
-
-.peoplePickerOption:focus {
-  position: relative;
-
-  outline: 3px solid #ffbf47;
-  outline-offset: -3px;
-
-  background: #f7eef2;
-}
-
-
-/* =========================================================
-   AVATAR
-   ========================================================= */
-
-.peoplePickerAvatar {
-  display: flex;
-  flex: 0 0 40px;
-
-  align-items: center;
-  justify-content: center;
-
-  width: 40px;
-  height: 40px;
-
-  border-radius: 50%;
-
-  background: #5b0e2d;
-  color: #ffffff;
-
-  font-size: 16px;
-  font-weight: 700;
-
-  text-transform: uppercase;
-}
-
-
-/* =========================================================
-   PERSON NAME + EMAIL
-   ========================================================= */
-
-.peoplePickerPerson {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-
-  min-width: 0;
-}
-
-.peoplePickerPerson strong {
-  display: block;
-
-  overflow: hidden;
-
-  color: #222222;
-
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.4;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.peoplePickerPerson span {
-  display: block;
-
-  margin-top: 2px;
-
-  overflow: hidden;
-
-  color: #626262;
-
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.4;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-
-/* =========================================================
-   SEARCHING / NO USERS
-   ========================================================= */
-
-.peoplePickerEmpty {
-  padding: 15px;
-
-  background: #ffffff;
-
-  color: #626262;
-
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-
-/* =========================================================
-   SELECTED PERSON
-   ========================================================= */
-
-.peoplePickerSelected {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-
-  width: 100%;
-  max-width: 700px;
-
-  margin-top: 8px;
-  padding: 10px 12px;
-
-  border: 1px solid #cccccc;
-  border-left: 4px solid #5b0e2d;
-  border-radius: 2px;
-
-  background: #fbf7f9;
-}
-
-.peoplePickerSelected .peoplePickerAvatar {
-  flex-basis: 36px;
-
-  width: 36px;
-  height: 36px;
-
-  font-size: 14px;
-}
-
-.peoplePickerSelected > span:last-child {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-
-  min-width: 0;
-}
-
-.peoplePickerSelected strong {
-  display: block;
-
-  color: #222222;
-
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.peoplePickerEmail {
-  display: block;
-
-  margin-top: 2px;
-
-  overflow: hidden;
-
-  color: #626262;
-
-  font-size: 13px;
-  font-weight: 400;
-
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-
-/* =========================================================
-   PEOPLE PICKER HINT
-   ========================================================= */
-
-.peoplePicker .hint {
-  margin: 6px 0 0;
-
-  color: #626262;
-
-  font-size: 13px;
-  font-weight: 400;
-}
-
-
-/* =========================================================
-   PEOPLE PICKER ERROR
-   ========================================================= */
-
-.peoplePicker .errorMessage {
-  margin-top: 7px;
-
-  color: #b10e1e;
-
-  font-size: 14px;
-  font-weight: 700;
-}
-
-
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media screen and (max-width: 768px) {
+  .paginationSection {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pagination {
+    width: 100%;
+  }
 
   .peoplePicker,
   .peoplePickerControl,
@@ -1192,77 +1728,632 @@ button {
 
   .peoplePickerAvatar {
     flex: 0 0 36px;
-
     width: 36px;
     height: 36px;
-
     font-size: 14px;
+  }
+
+  .requestActionsMenu {
+    width: 190px;
+  }
+
+  /*
+   * Prevent the generic mobile .actions button rule
+   * from affecting the table three-dot button.
+   */
+
+  .tableWrap td .requestActionsButton {
+    width: 38px;
+    min-width: 38px;
   }
 }
 
 
-/* Textbox and dropdown - same width */
-.formGroup input[type="text"],
-.formGroup input[type="date"],
-.formGroup input[type="email"],
-.formGroup input[type="number"],
-.formGroup textarea,
-.formGroup select {
-  width: 100%;
-  max-width: 700px;
-  box-sizing: border-box;
+/* =========================================================
+   RESPONSIVE - SMALL MOBILE
+   ========================================================= */
+
+@media screen and (max-width: 600px) {
+
+  .signedInBanner,
+  .userContext {
+    padding: 12px 14px;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    min-height: 90px;
+  }
+
+  .appHeaderTitle {
+    font-size: 23px;
+  }
+
+  .formPage h1,
+  .review h1 {
+    font-size: 26px;
+  }
+
+  .formPage h2,
+  .review h2 {
+    font-size: 22px;
+  }
+
+  .pagination {
+    gap: 3px;
+  }
+
+  .paginationButton {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+
+  .requestActionsMenu {
+    width: 180px;
+  }
 }
 
-/* =====================================================
-   SIGNED IN USER BANNER
-   ===================================================== */
+/* =========================================================
+   ACTION MENU PORTAL FIX
+   Existing AuthorisedAbsence styles above are unchanged.
+   ========================================================= */
 
-.signedInBanner {
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0 0 24px 0;
-  padding: 14px 18px;
+.requestActionsMenuPortal {
+  position: fixed !important;
+  right: auto !important;
+  z-index: 2147483000;
+  width: 200px;
+  margin: 0;
+  padding: 7px 0;
+  overflow: hidden;
+  border: 1px solid #dedede;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  text-align: left;
+}
 
+.requestActionsMenuPortal .requestActionsItem {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 14px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  color: #242424;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
 
-  background: #f3f2f1;
-  border-left: 5px solid #5b0e2d;
+.requestActionsMenuPortal .requestActionsItem:hover {
+  background: #f4f4f4;
+  color: #242424;
+}
 
-  font-family: Arial, sans-serif;
+.requestActionsMenuPortal .requestActionsItem:focus {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid #ffbf47;
+  outline-offset: -3px;
+  background: #f4f4f4;
+}
+
+.requestActionsMenuPortal .requestActionsIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 25px;
+  width: 25px;
+  height: 25px;
+  color: #6b6b6b;
+}
+
+.requestActionsMenuPortal .requestActionsIcon svg {
+  display: block;
+}
+
+.requestActionsMenuPortal .requestActionsLabel {
+  display: block;
+  flex: 1;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.requestActionsMenuPortal .requestActionsDivider {
+  height: 1px;
+  margin: 5px 0;
+  background: #e1e1e1;
+}
+
+.requestActionsMenuPortal .requestActionsDelete {
+  color: #b10e1e;
+}
+
+.requestActionsMenuPortal .requestActionsDelete .requestActionsIcon {
+  color: #b10e1e;
+}
+
+.requestActionsMenuPortal .requestActionsDelete:hover {
+  background: #fff2f2;
+  color: #b10e1e;
+}
+
+/* =========================================================
+   DASHBOARD FILTERS - LABEL ABOVE FIELD / FULL ROW
+   ========================================================= */
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px auto;
+  align-items: end;
+  gap: 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dashboardFilterField {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashboardFilterField label {
+  display: block;
+  margin: 0 0 7px 0;
+  color: #333333;
   font-size: 16px;
-  line-height: 1.5;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
-.signedInBannerText {
-  display: inline-block;
+.dashboardFilterField input,
+.dashboardFilterField select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 2px solid #505a5f;
+  border-radius: 0;
+  background: #ffffff;
+  color: #0b0c0c;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
 }
 
-.signedInBannerText strong {
+.dashboardFilterField input:focus,
+.dashboardFilterField select:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 0;
+  border-color: #0b0c0c;
+}
+
+.dashboardSearchField {
+  width: 100%;
+}
+
+.dashboardStatusField {
+  width: 230px;
+}
+
+.dashboardFilterActions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.dashboardFilterActions button {
+  min-height: 42px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   DASHBOARD STATUS CARD COLOUR CODING
+   ========================================================= */
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d8d8d8;
+  border-top-width: 5px;
+  background: #ffffff;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.cardAll {
+  border-top-color: #5b0e2d;
+}
+
+.cardAll span {
+  color: #5b0e2d;
+}
+
+.cardAll:hover {
+  border-color: #5b0e2d;
+  background: #faf5f7;
+}
+
+.cardDraft {
+  border-top-color: #6f777b;
+}
+
+.cardDraft span {
+  color: #505a5f;
+}
+
+.cardDraft:hover {
+  border-color: #6f777b;
+  background: #f5f5f5;
+}
+
+.cardPendingApproval {
+  border-top-color: #d68a00;
+}
+
+.cardPendingApproval span {
+  color: #9a6200;
+}
+
+.cardPendingApproval:hover {
+  border-color: #d68a00;
+  background: #fff8e6;
+}
+
+.cardUnderReview {
+  border-top-color: #1d70b8;
+}
+
+.cardUnderReview span {
+  color: #1d70b8;
+}
+
+.cardUnderReview:hover {
+  border-color: #1d70b8;
+  background: #eef6fc;
+}
+
+.cardApproved {
+  border-top-color: #00703c;
+}
+
+.cardApproved span {
+  color: #00703c;
+}
+
+.cardApproved:hover {
+  border-color: #00703c;
+  background: #edf7f1;
+}
+
+.cardRejected {
+  border-top-color: #d4351c;
+}
+
+.cardRejected span {
+  color: #d4351c;
+}
+
+.cardRejected:hover {
+  border-color: #d4351c;
+  background: #fdf2f0;
+}
+
+.cardAll.selected {
+  border-color: #5b0e2d;
+  border-top-color: #5b0e2d;
+  background: #f7eef2;
+  box-shadow: 0 0 0 1px #5b0e2d;
+}
+
+.cardDraft.selected {
+  border-color: #6f777b;
+  border-top-color: #6f777b;
+  background: #eeeeee;
+  box-shadow: 0 0 0 1px #6f777b;
+}
+
+.cardPendingApproval.selected {
+  border-color: #d68a00;
+  border-top-color: #d68a00;
+  background: #fff3cd;
+  box-shadow: 0 0 0 1px #d68a00;
+}
+
+.cardUnderReview.selected {
+  border-color: #1d70b8;
+  border-top-color: #1d70b8;
+  background: #e5f1f9;
+  box-shadow: 0 0 0 1px #1d70b8;
+}
+
+.cardApproved.selected {
+  border-color: #00703c;
+  border-top-color: #00703c;
+  background: #e3f3e9;
+  box-shadow: 0 0 0 1px #00703c;
+}
+
+.cardRejected.selected {
+  border-color: #d4351c;
+  border-top-color: #d4351c;
+  background: #fbe9e7;
+  box-shadow: 0 0 0 1px #d4351c;
+}
+
+.card strong {
+  color: #333333;
+}
+
+.card span {
   font-weight: 700;
 }
 
-.signedInBannerSeparator {
-  font-weight: 700;
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
 }
 
-.signedInBannerRole {
-  display: inline-block;
-  padding: 3px 10px;
+.card:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
 
-  background: #5b0e2d;
+
+/* =========================================================
+   DASHBOARD FILTER RESPONSIVE LAYOUT
+   ========================================================= */
+
+@media screen and (max-width: 900px) {
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) 200px;
+  }
+
+  .dashboardStatusField {
+    width: 100%;
+  }
+
+  .dashboardFilterActions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .dashboardSearchField,
+  .dashboardStatusField,
+  .dashboardFilterActions {
+    width: 100%;
+  }
+
+  .dashboardFilterActions button {
+    width: 100%;
+  }
+}
+
+
+.serviceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+}
+
+.serviceHeaderLeft {
+  min-width: 0;
+}
+
+.serviceHeaderLeft h1 {
+  margin: 0;
+}
+
+.serviceHeaderLeft p {
+  margin: 5px 0 0;
+}
+
+.welcomeUser {
+  margin-left: auto;
+  color: #5b0e2d;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media screen and (max-width: 600px) {
+  .serviceHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .welcomeUser {
+    margin-left: 0;
+    text-align: left;
+  }
+}
+
+/* =========================================================
+   APPLICATION HEADER - WELCOME USER
+   ========================================================= */
+
+.appHeaderInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.appHeaderText {
+  min-width: 0;
+}
+
+.welcomeUser {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   color: #ffffff;
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: right;
+  white-space: nowrap;
+}
 
+.welcomeUser strong {
+  font-weight: 700;
+}
+
+.welcomeUserRole {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media screen and (max-width: 768px) {
+  .appHeaderInner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .welcomeUser {
+    margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    text-align: left;
+    white-space: normal;
+  }
+}
+
+
+/* =========================================================
+   SUPPORTING EVIDENCE TABLE
+   ========================================================= */
+
+.evidenceTableWrap {
+  width: 100%;
+  margin-top: 14px;
+  overflow-x: auto;
+  border: 1px solid #d1d1d1;
+  background: #ffffff;
+}
+
+.evidenceTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.evidenceTable th {
+  padding: 12px 14px;
+  border-bottom: 2px solid #8b1e41;
+  background: #f0f0f0;
+  color: #333333;
   font-size: 14px;
   font-weight: 700;
-
-  border-radius: 3px;
+  text-align: left;
 }
 
-@media (max-width: 600px) {
-  .signedInBanner {
-    padding: 12px 14px;
+.evidenceTable td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #dddddd;
+  color: #333333;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.evidenceTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.evidenceTable tbody tr:hover {
+  background: #fafafa;
+}
+
+.evidenceTable .fileIcon {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 3px 6px;
+  border-radius: 2px;
+  background: #eeeeee;
+  color: #5b0e2d;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.evidenceFileName {
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.evidenceActionCell {
+  width: 100px;
+  white-space: nowrap;
+}
+
+.review .evidenceViewLink {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid #5b0e2d;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #5b0e2d;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.review .evidenceViewLink:hover {
+  background: #f7eef2;
+  text-decoration: underline;
+}
+
+.review .evidenceViewLink:focus {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+@media screen and (max-width: 600px) {
+  .evidenceTable th,
+  .evidenceTable td {
+    padding: 10px;
+  }
+
+  .evidenceActionCell {
+    width: 80px;
   }
 }

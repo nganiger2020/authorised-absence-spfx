@@ -1,0 +1,659 @@
+{
+    "value": [
+        {
+            "InternalName": "ContentTypeId",
+            "Title": "Content Type ID",
+            "TypeAsString": "ContentTypeId"
+        },
+        {
+            "InternalName": "Title",
+            "Title": "1AM. Student ID",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "_ModerationComments",
+            "Title": "Approver Comments",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "File_x0020_Type",
+            "Title": "File Type",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "ComplianceAssetId",
+            "Title": "Compliance Asset Id",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "Stage",
+            "Title": "Stage",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "Status",
+            "Title": "Status",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "Student",
+            "Title": "1AM. Student",
+            "TypeAsString": "User"
+        },
+        {
+            "InternalName": "LevelOfStudy",
+            "Title": "1BR. Level of study",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "DoB",
+            "Title": "1AR. Date of Birth",
+            "TypeAsString": "DateTime"
+        },
+        {
+            "InternalName": "LinkTitleNoMenu",
+            "Title": "1AM. Student ID",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "LinkTitle",
+            "Title": "1AM. Student ID",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "LinkTitle2",
+            "Title": "1AM. Student ID",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "Programme",
+            "Title": "1BR. Programme of study",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "VisaType",
+            "Title": "1C. Visa Type",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "VisaOtherComments",
+            "Title": "1C. Details (other visa type)",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "VisaStartDate",
+            "Title": "1C. Visa Start Date",
+            "TypeAsString": "DateTime"
+        },
+        {
+            "InternalName": "VisaEndDate",
+            "Title": "1C. Visa/BRP Expiry Date",
+            "TypeAsString": "DateTime"
+        },
+        {
+            "InternalName": "VisaAttachment",
+            "Title": "1CR. Current Visa/BRP",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "PassportAttachment",
+            "Title": "1CR. Current Passport",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "AbsenceStartDate",
+            "Title": "1DR. Start date of authorised absence",
+            "TypeAsString": "DateTime"
+        },
+        {
+            "InternalName": "AbsenceEndDate",
+            "Title": "1DR. End date of authorised absence",
+            "TypeAsString": "DateTime"
+        },
+        {
+            "InternalName": "AbsenceReasons",
+            "Title": "1DR. Reason(s) for absence",
+            "TypeAsString": "MultiChoice"
+        },
+        {
+            "InternalName": "ReasonOtherComments",
+            "Title": "1DD. Details of absence",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "ConferenceAttachment",
+            "Title": "1DD. Conference Evidence",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "FamilyIllnessDetails",
+            "Title": "1FD. Details of absence",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "FamilyIllnessAttachment",
+            "Title": "1DD. Family Illness/Bereavement Evidence",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "HolidayUGAttachment",
+            "Title": "1D. Holiday (taught) Evidence",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "HolidayUGOtherAttachment",
+            "Title": "1D. Holiday (taught) Other Evidence",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "OtherAttachment",
+            "Title": "1DD. Other Absence Reason Evidence",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "MedicalAttachment",
+            "Title": "1DD. Medical Evidence",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "Returning",
+            "Title": "1DD. Returning following authorised absence",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "ReasonsNotReturning",
+            "Title": "1DD. Reasons for not Returning",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "TravelOutside",
+            "Title": "1DR. Travelling outside UK",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "TravelOutsideDetails",
+            "Title": "1DD. Travel details",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "Signatory",
+            "Title": "2E. Authorised Signatory",
+            "TypeAsString": "User"
+        },
+        {
+            "InternalName": "AbsenceReasonsConfirm",
+            "Title": "2FR. Reasons(s) for absence",
+            "TypeAsString": "MultiChoice"
+        },
+        {
+            "InternalName": "MissSessions",
+            "Title": "2FD. Will teaching sessions be missed",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "MissSessionsRationale",
+            "Title": "2FD. Rationale for Approving Absence Request",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "ReasonConfOtherComments",
+            "Title": "2FD. Details (other absence reason)",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "MonitoringConditions",
+            "Title": "2FD. Absence Monitoring Conditions",
+            "TypeAsString": "MultiChoice"
+        },
+        {
+            "InternalName": "AbsenceMonitoringDetails",
+            "Title": "2FD. Details (other absence monitoring)",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "RequestApproved",
+            "Title": "2G. Absence Request Approved",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "RequestRejectionDetails",
+            "Title": "2GD. Reason(s) for denying request",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "Administrator",
+            "Title": "Administrator",
+            "TypeAsString": "User"
+        },
+        {
+            "InternalName": "letterofconfirmationforauthorise",
+            "Title": "1DR. Do you need a letter confirming approval of your authorised absence?",
+            "TypeAsString": "Choice"
+        },
+        {
+            "InternalName": "Reasonforrequestingaletter",
+            "Title": "1DD. Reason for requesting a letter",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "Modified",
+            "Title": "Modified",
+            "TypeAsString": "DateTime"
+        },
+        {
+            "InternalName": "Author",
+            "Title": "Created By",
+            "TypeAsString": "User"
+        },
+        {
+            "InternalName": "YEAR",
+            "Title": "YEAR",
+            "TypeAsString": "Calculated"
+        },
+        {
+            "InternalName": "Created",
+            "Title": "Created",
+            "TypeAsString": "DateTime"
+        },
+        {
+            "InternalName": "_ColorHex",
+            "Title": "Color",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "_ColorTag",
+            "Title": "Color Tag",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "_Emoji",
+            "Title": "Emoji",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "Admin",
+            "Title": "Admin",
+            "TypeAsString": "TaxonomyFieldType"
+        },
+        {
+            "InternalName": "gc2b7af94580497c85cd58674c10864e",
+            "Title": "Admin_0",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "TaxCatchAll",
+            "Title": "Taxonomy Catch All Column",
+            "TypeAsString": "LookupMulti"
+        },
+        {
+            "InternalName": "Admin_x0020_Group_x0020__x0028_T",
+            "Title": "Admin Group (Test)",
+            "TypeAsString": "User"
+        },
+        {
+            "InternalName": "test1",
+            "Title": "test1",
+            "TypeAsString": "User"
+        },
+        {
+            "InternalName": "MedicalEvidenceDetails",
+            "Title": "1MD. Details of absence",
+            "TypeAsString": "Note"
+        },
+        {
+            "InternalName": "ID",
+            "Title": "ID",
+            "TypeAsString": "Counter"
+        },
+        {
+            "InternalName": "ContentType",
+            "Title": "Content Type",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "Editor",
+            "Title": "Modified By",
+            "TypeAsString": "User"
+        },
+        {
+            "InternalName": "_HasCopyDestinations",
+            "Title": "Has Copy Destinations",
+            "TypeAsString": "Boolean"
+        },
+        {
+            "InternalName": "_CopySource",
+            "Title": "Copy Source",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "owshiddenversion",
+            "Title": "owshiddenversion",
+            "TypeAsString": "Integer"
+        },
+        {
+            "InternalName": "WorkflowVersion",
+            "Title": "Workflow Version",
+            "TypeAsString": "Integer"
+        },
+        {
+            "InternalName": "_UIVersion",
+            "Title": "UI Version",
+            "TypeAsString": "Integer"
+        },
+        {
+            "InternalName": "_UIVersionString",
+            "Title": "Version",
+            "TypeAsString": "Text"
+        },
+        {
+            "InternalName": "Attachments",
+            "Title": "Attachments",
+            "TypeAsString": "Attachments"
+        },
+        {
+            "InternalName": "_ModerationStatus",
+            "Title": "Approval Status",
+            "TypeAsString": "ModStat"
+        },
+        {
+            "InternalName": "Edit",
+            "Title": "Edit",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "SelectTitle",
+            "Title": "Select",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "InstanceID",
+            "Title": "Instance ID",
+            "TypeAsString": "Integer"
+        },
+        {
+            "InternalName": "Order",
+            "Title": "Order",
+            "TypeAsString": "Number"
+        },
+        {
+            "InternalName": "GUID",
+            "Title": "GUID",
+            "TypeAsString": "Guid"
+        },
+        {
+            "InternalName": "WorkflowInstanceID",
+            "Title": "Workflow Instance ID",
+            "TypeAsString": "Guid"
+        },
+        {
+            "InternalName": "FileRef",
+            "Title": "URL Path",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "FileDirRef",
+            "Title": "Path",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "Last_x0020_Modified",
+            "Title": "Modified",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "Created_x0020_Date",
+            "Title": "Created",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "FSObjType",
+            "Title": "Item Type",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "SortBehavior",
+            "Title": "Sort Type",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "PermMask",
+            "Title": "Effective Permissions Mask",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "PrincipalCount",
+            "Title": "Principal Count",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "FileLeafRef",
+            "Title": "Name",
+            "TypeAsString": "File"
+        },
+        {
+            "InternalName": "UniqueId",
+            "Title": "Unique Id",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "ParentUniqueId",
+            "Title": "Document Parent Identifier",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "SyncClientId",
+            "Title": "Client Id",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "ProgId",
+            "Title": "ProgId",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "ScopeId",
+            "Title": "ScopeId",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "HTML_x0020_File_x0020_Type",
+            "Title": "HTML File Type",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "_EditMenuTableStart",
+            "Title": "Edit Menu Table Start",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "_EditMenuTableStart2",
+            "Title": "Edit Menu Table Start",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "_EditMenuTableEnd",
+            "Title": "Edit Menu Table End",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "LinkFilenameNoMenu",
+            "Title": "Name",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "LinkFilename",
+            "Title": "Name",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "LinkFilename2",
+            "Title": "Name",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "DocIcon",
+            "Title": "Type",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "ServerUrl",
+            "Title": "Server Relative URL",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "EncodedAbsUrl",
+            "Title": "Encoded Absolute URL",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "BaseName",
+            "Title": "File Name",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "MetaInfo",
+            "Title": "Property Bag",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_Level",
+            "Title": "Level",
+            "TypeAsString": "Integer"
+        },
+        {
+            "InternalName": "_IsCurrentVersion",
+            "Title": "Is Current Version",
+            "TypeAsString": "Boolean"
+        },
+        {
+            "InternalName": "ItemChildCount",
+            "Title": "Item Child Count",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "FolderChildCount",
+            "Title": "Folder Child Count",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "Restricted",
+            "Title": "Restricted",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "OriginatorId",
+            "Title": "Originator Id",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "NoExecute",
+            "Title": "NoExecute",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "ContentVersion",
+            "Title": "Content Version",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_ComplianceFlags",
+            "Title": "Label setting",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_ComplianceTag",
+            "Title": "Retention label",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_ComplianceTagWrittenTime",
+            "Title": "Retention label Applied",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_ComplianceTagUserId",
+            "Title": "Label applied by",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_IsRecord",
+            "Title": "Item is a Record",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "AccessPolicy",
+            "Title": "Access Policy",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_VirusStatus",
+            "Title": "VirusStatus",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_VirusVendorID",
+            "Title": "VirusVendorID",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_VirusInfo",
+            "Title": "VirusInfo",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_RansomwareAnomalyMetaInfo",
+            "Title": "RansomwareAnomalyMetaInfo",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_DraftOwnerId",
+            "Title": "Draft Owner Id",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "MainLinkSettings",
+            "Title": "Main Link settings",
+            "TypeAsString": "Computed"
+        },
+        {
+            "InternalName": "AppAuthor",
+            "Title": "App Created By",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "AppEditor",
+            "Title": "App Modified By",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "SMTotalSize",
+            "Title": "Total Size",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "SMLastModifiedDate",
+            "Title": "Last Modified Date",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "SMTotalFileStreamSize",
+            "Title": "Total File Stream Size",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "SMTotalFileCount",
+            "Title": "Total File Count",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_CommentFlags",
+            "Title": "Comment settings",
+            "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "_CommentCount",
+            "Title": "Comment count",
+            "TypeAsString": "Lookup"
+        }
+    ]
+}

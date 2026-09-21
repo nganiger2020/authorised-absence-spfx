@@ -1,975 +1,696 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 
 import {
   IRequest,
   UserRole
 } from "../../models/Models";
 
-
 interface Props {
-
   role: UserRole;
-
   items: IRequest[];
-
   loading: boolean;
-
+  currentUserEmail: string;
   onNew: () => void;
-
-  onOpen: (
-    request: IRequest
-  ) => void;
-
-  onReview: (
-    request: IRequest
-  ) => void;
-
-  onDelete: (
-    request: IRequest
-  ) => void;
+  onOpen: (request: IRequest) => void;
+  onReview: (request: IRequest) => void;
+  onDelete: (request: IRequest) => void;
 }
 
+type SortField =
+  | "Id"
+  | "Student"
+  | "AbsenceStartDate"
+  | "Status";
 
-export const Dashboard:
-React.FC<Props> = (props) => {
+type SortDirection = "asc" | "desc";
 
-  const [search, setSearch] =
-    React.useState<string>("");
+const normalize = (value?: string): string =>
+  (value || "").trim().toLowerCase();
 
-  const [filter, setFilter] =
-    React.useState<string>("All");
+const isReviewableStatus = (status?: string): boolean => {
+  const value = normalize(status);
+  return (
+    value === "submitted" ||
+    value === "pending approval" ||
+    value === "under review"
+  );
+};
 
-
-  /* =====================================================
-     CARDS
-  ===================================================== */
-
-  const studentCards:
-    string[] = [
-      "All",
-      "Draft",
-      "In Progress",
-      "Approved",
-      "Rejected"
-    ];
-
-
-  const approverCards:
-    string[] = [
-      "All",
-      "Pending Approval",
-      "In Review",
-      "Approved",
-      "Rejected"
-    ];
-
-
-  const adminCards:
-    string[] = [
-      "All",
-      "Draft",
-      "In Progress",
-      "Pending Approval",
-      "Approved",
-      "Rejected"
-    ];
-
-
-  let cards:
-    string[] = [];
-
-
-  if (
-    props.role === "Student"
-  ) {
-
-    cards =
-      studentCards;
-
-  } else if (
-    props.role === "Approver"
-  ) {
-
-    cards =
-      approverCards;
-
-  } else {
-
-    cards =
-      adminCards;
+const displayDate = (value?: string): string => {
+  if (!value) {
+    return "-";
   }
 
+  const date = new Date(value);
+  if (isNaN(date.getTime())) {
+    return value.substring(0, 10);
+  }
 
-  /* =====================================================
-     STATUS GROUP
-  ===================================================== */
+  return date.toLocaleDateString("en-GB");
+};
 
-  const statusGroup = (
-    request: IRequest,
-    card: string
-  ): boolean => {
+const getStatusClass = (status?: string): string => {
+  switch (normalize(status)) {
+    case "approved":
+      return "pill statusApproved";
+    case "rejected":
+      return "pill statusRejected";
+    case "under review":
+      return "pill statusReview";
+    case "submitted":
+    case "pending approval":
+      return "pill statusPending";
+    default:
+      return "pill statusDraft";
+  }
+};
 
-    const status =
-      (
-        request.Status ||
-        ""
-      ).toLowerCase();
+export const Dashboard: React.FC<Props> = (props) => {
+  const [search, setSearch] = React.useState<string>("");
+  const [statusFilter, setStatusFilter] = React.useState<string>("All");
+  const [sortField, setSortField] = React.useState<SortField>("Id");
+  const [sortDirection, setSortDirection] = React.useState<SortDirection>("desc");
+  const [page, setPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(10);
+  const [openActionMenuId, setOpenActionMenuId] =
+    React.useState<number | undefined>(undefined);
+  const [actionMenuPosition, setActionMenuPosition] =
+    React.useState<{ top: number; left: number } | undefined>(undefined);
 
+  const closeActionMenu = React.useCallback((): void => {
+    setOpenActionMenuId(undefined);
+    setActionMenuPosition(undefined);
+  }, []);
 
-    if (
-      card === "All"
-    ) {
-      return true;
+  React.useEffect(() => {
+    if (openActionMenuId === undefined) {
+      return;
     }
 
-
-    if (
-      card === "In Progress"
-    ) {
-
-      const statuses = [
-        "submitted",
-        "pending approval",
-        "under review"
-      ];
-
-      return (
-        statuses.indexOf(
-          status
-        ) !== -1
-      );
-    }
-
-
-    if (
-      card === "Pending Approval"
-    ) {
-
-      const statuses = [
-        "submitted",
-        "pending approval"
-      ];
-
-      return (
-        statuses.indexOf(
-          status
-        ) !== -1
-      );
-    }
-
-
-    if (
-      card === "In Review"
-    ) {
-
-      return (
-        status ===
-        "under review"
-      );
-    }
-
-
-    return (
-      status ===
-      card.toLowerCase()
-    );
-  };
-
-
-  /* =====================================================
-     STATUS CSS
-  ===================================================== */
-
-  const getStatusClass = (
-    status?: string
-  ): string => {
-
-    const value =
-      (
-        status ||
-        ""
-      ).toLowerCase();
-
-
-    if (
-      value === "approved"
-    ) {
-      return (
-        "pill statusApproved"
-      );
-    }
-
-
-    if (
-      value === "rejected"
-    ) {
-      return (
-        "pill statusRejected"
-      );
-    }
-
-
-    if (
-      value ===
-        "under review"
-    ) {
-      return (
-        "pill statusReview"
-      );
-    }
-
-
-    if (
-      value === "submitted" ||
-      value ===
-        "pending approval"
-    ) {
-      return (
-        "pill statusPending"
-      );
-    }
-
-
-    return (
-      "pill statusDraft"
-    );
-  };
-
-
-  /* =====================================================
-     CARD CSS
-  ===================================================== */
-
-  const getCardClass = (
-    card: string
-  ): string => {
-
-    if (
-      filter === card
-    ) {
-      return "card selected";
-    }
-
-    return "card";
-  };
-
-
-  /* =====================================================
-     CARD COUNT
-  ===================================================== */
-
-  const getCardCount = (
-    card: string
-  ): number => {
-
-    return props.items.filter(
-      request =>
-        statusGroup(
-          request,
-          card
-        )
-    ).length;
-  };
-
-
-  /* =====================================================
-     SEARCH / FILTER
-  ===================================================== */
-
-  const searchValue =
-    search
-      .trim()
-      .toLowerCase();
-
-
-  const visible =
-    props.items.filter(
-      request => {
-
-        if (
-          filter !== "All" &&
-          !statusGroup(
-            request,
-            filter
-          )
-        ) {
-          return false;
-        }
-
-
-        if (!searchValue) {
-          return true;
-        }
-
-
-        const requestReference =
-          request.Id
-            ? "AA-" +
-              request.Id
-            : "";
-
-
-        const studentName =
-          request.Student
-            ? request.Student.Title
-            : "";
-
-
-        const reasons =
-          (
-            request.AbsenceReasons ||
-            []
-          ).join(" ");
-
-
-        const programme =
-          request.Programme ||
-          "";
-
-
-        const status =
-          request.Status ||
-          "";
-
-
-        const searchableText =
-          (
-            requestReference +
-            " " +
-            request.Title +
-            " " +
-            studentName +
-            " " +
-            reasons +
-            " " +
-            programme +
-            " " +
-            status
-          ).toLowerCase();
-
-
-        return (
-          searchableText.indexOf(
-            searchValue
-          ) !== -1
-        );
-      }
-    );
-
-
-  /* =====================================================
-     DASHBOARD TITLE
-  ===================================================== */
-
-  const dashboardTitle =
-    (): string => {
-
+    const handleDocumentClick = (event: MouseEvent): void => {
+      const target = event.target as HTMLElement;
       if (
-        props.role ===
-        "Student"
+        target.closest(".requestActionsButton") ||
+        target.closest(".requestActionsMenuPortal")
       ) {
-        return "My Requests";
+        return;
       }
-
-
-      if (
-        props.role ===
-        "Approver"
-      ) {
-        return (
-          "Requests Assigned to Me"
-        );
-      }
-
-
-      return "All Requests";
+      closeActionMenu();
     };
 
+    const handleScroll = (): void => closeActionMenu();
+    const handleResize = (): void => closeActionMenu();
 
-  const dashboardDescription =
-    (): string => {
+    document.addEventListener("click", handleDocumentClick);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
 
-      if (
-        props.role ===
-        "Student"
-      ) {
+    return (): void => {
+      document.removeEventListener("click", handleDocumentClick);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [openActionMenuId, closeActionMenu]);
 
-        return (
-          "View and manage your authorised absence requests."
-        );
+  const showActionMenu = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    requestId?: number
+  ): void => {
+    event.stopPropagation();
+
+    if (!requestId) {
+      return;
+    }
+
+    if (openActionMenuId === requestId) {
+      closeActionMenu();
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 200;
+    const menuHeight = 135;
+    const gap = 6;
+    const padding = 8;
+
+    let left = rect.right - menuWidth;
+
+    if (left < padding) {
+      left = padding;
+    }
+
+    if (left + menuWidth > window.innerWidth - padding) {
+      left = window.innerWidth - menuWidth - padding;
+    }
+
+    let top = rect.bottom + gap;
+
+    if (window.innerHeight - rect.bottom < menuHeight) {
+      top = Math.max(
+        padding,
+        rect.top - menuHeight - gap
+      );
+    }
+
+    setActionMenuPosition({ top, left });
+    setOpenActionMenuId(requestId);
+  };
+
+  const currentEmail = normalize(props.currentUserEmail);
+
+  const canReview = React.useCallback(
+    (request: IRequest): boolean => {
+      if (!isReviewableStatus(request.Status)) {
+        return false;
       }
 
-
-      if (
-        props.role ===
-        "Approver"
-      ) {
-
-        return (
-          "Review authorised absence requests assigned to you."
-        );
+      if (props.role === "Admin") {
+        return true;
       }
 
+      if (!currentEmail) {
+        return false;
+      }
+
+      const signatoryEmail = normalize(
+        request.Signatory && request.Signatory.EMail
+          ? request.Signatory.EMail
+          : ""
+      );
+
+      /*
+       * Admin is Managed Metadata. AdminLabel contains
+       * the administrator email address.
+       */
+      const administratorEmail = normalize(request.AdminLabel);
 
       return (
-        "View and manage authorised absence requests."
+        currentEmail === signatoryEmail ||
+        currentEmail === administratorEmail
       );
+    },
+    [props.role, currentEmail]
+  );
+
+  const counts = React.useMemo(() => {
+    const result = {
+      All: props.items.length,
+      Draft: 0,
+      "Pending Approval": 0,
+      "Under Review": 0,
+      Approved: 0,
+      Rejected: 0
     };
 
+    props.items.forEach((item: IRequest) => {
+      const status = normalize(item.Status);
 
-  /* =====================================================
-     REVIEW STATUS
-  ===================================================== */
+      if (status === "draft") {
+        result.Draft++;
+      } else if (status === "submitted" || status === "pending approval") {
+        result["Pending Approval"]++;
+      } else if (status === "under review") {
+        result["Under Review"]++;
+      } else if (status === "approved") {
+        result.Approved++;
+      } else if (status === "rejected") {
+        result.Rejected++;
+      }
+    });
 
-  const canReview = (
-    request: IRequest
-  ): boolean => {
+    return result;
+  }, [props.items]);
 
-    if (props.role === "Admin") {
-      return true;
-    }
+  const filteredItems = React.useMemo(() => {
+    const query = normalize(search);
 
-    if (props.role !== "Approver") {
-      return false;
-    }
+    const result = props.items.filter((request: IRequest) => {
+      const status = normalize(request.Status);
 
+      let statusMatches = true;
 
-    const reviewStatuses =
-      [
-        "Submitted",
-        "Pending Approval",
-        "Under Review"
+      if (statusFilter === "Draft") {
+        statusMatches = status === "draft";
+      } else if (statusFilter === "Pending Approval") {
+        statusMatches = status === "submitted" || status === "pending approval";
+      } else if (statusFilter === "Under Review") {
+        statusMatches = status === "under review";
+      } else if (statusFilter !== "All") {
+        statusMatches = status === normalize(statusFilter);
+      }
+
+      if (!statusMatches) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const values = [
+        request.Id ? "AA-" + request.Id : "",
+        request.Title || "",
+        request.Student ? request.Student.Title : "",
+        request.Student ? request.Student.EMail : "",
+        request.Programme || "",
+        request.Status || "",
+        request.Signatory ? request.Signatory.Title : "",
+        request.Signatory ? request.Signatory.EMail : "",
+        request.AdminLabel || "",
+        (request.AbsenceReasons || []).join(" ")
       ];
 
+      return values.some((value?: string) =>
+        normalize(value).indexOf(query) >= 0
+      );
+    });
 
-    return (
-      reviewStatuses.indexOf(
-        request.Status ||
-        ""
-      ) !== -1
-    );
-  };
+    result.sort((a: IRequest, b: IRequest): number => {
+      let first: string | number = "";
+      let second: string | number = "";
 
+      if (sortField === "Id") {
+        first = a.Id || 0;
+        second = b.Id || 0;
+      } else if (sortField === "Student") {
+        first = a.Student ? a.Student.Title || "" : "";
+        second = b.Student ? b.Student.Title || "" : "";
+      } else if (sortField === "AbsenceStartDate") {
+        first = a.AbsenceStartDate || "";
+        second = b.AbsenceStartDate || "";
+      } else {
+        first = a.Status || "";
+        second = b.Status || "";
+      }
 
-  /* =====================================================
-     DATE
-  ===================================================== */
+      let comparison = 0;
 
-  const displayDate = (
-    value?: string
-  ): string => {
+      if (typeof first === "number" && typeof second === "number") {
+        comparison = first - second;
+      } else {
+        comparison = String(first).localeCompare(String(second));
+      }
 
-    if (!value) {
-      return "-";
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return result;
+  }, [props.items, search, statusFilter, sortField, sortDirection]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, pageSize]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredItems.length / pageSize)
+  );
+
+  React.useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
     }
+  }, [page, totalPages]);
 
-    return value.substring(
-      0,
-      10
-    );
+  const pageItems = React.useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, page, pageSize]);
+
+  const sort = (field: SortField): void => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
   };
 
+  const sortIndicator = (field: SortField): string => {
+    if (sortField !== field) {
+      return "";
+    }
+    return sortDirection === "asc" ? " ▲" : " ▼";
+  };
 
-  /* =====================================================
-     CLEAR
-  ===================================================== */
-
-  const clearFilters =
-    (): void => {
-
-      setSearch("");
-      setFilter("All");
-    };
-
-
-  /* =====================================================
-     RENDER
-  ===================================================== */
+  const cards: Array<{ label: string; count: number }> = [
+    { label: "All", count: counts.All },
+    { label: "Draft", count: counts.Draft },
+    { label: "Pending Approval", count: counts["Pending Approval"] },
+    { label: "Under Review", count: counts["Under Review"] },
+    { label: "Approved", count: counts.Approved },
+    { label: "Rejected", count: counts.Rejected }
+  ];
 
   return (
-
     <div className="dashboard">
-
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
       <div className="aaHeader">
-
         <div>
-
-          <h1>
-            {dashboardTitle()}
-          </h1>
-
+          <h1>Authorised Absence Requests</h1>
           <p className="pageIntro">
-            {
-              dashboardDescription()
-            }
+            Create a new request or manage requests available to you.
           </p>
-
         </div>
 
+        <button
+          type="button"
+          className="primary"
+          onClick={props.onNew}
+        >
+          + New Request
+        </button>
+      </div>
 
-        {
-          (props.role === "Student" ||
-           props.role === "Admin") &&
-          (
+      <div className="cards" aria-label="Request status filters">
+        {cards.map(card => {
+          const cardStatusClass =
+            "card" + card.label.replace(/\s+/g, "");
+
+          return (
             <button
               type="button"
-              className="primary"
-              onClick={
-                props.onNew
+              key={card.label}
+              className={
+                "card " +
+                cardStatusClass +
+                (statusFilter === card.label ? " selected" : "")
               }
+              aria-pressed={statusFilter === card.label}
+              onClick={(): void => {
+                closeActionMenu();
+                setStatusFilter(card.label);
+              }}
             >
-              + New Request
+              <span>{card.count}</span>
+              <strong>{card.label}</strong>
             </button>
-          )
-        }
-
+          );
+        })}
       </div>
 
-
-      {/* =================================================
-          STATUS CARDS
-      ================================================= */}
-
-      <div
-        className="cards"
-        aria-label={
-          "Filter requests by status"
-        }
-      >
-
-        {
-          cards.map(
-            card => (
-
-              <button
-                type="button"
-                key={card}
-                className={
-                  getCardClass(
-                    card
-                  )
-                }
-                aria-pressed={
-                  filter === card
-                }
-                onClick={
-                  () =>
-                    setFilter(
-                      card
-                    )
-                }
-              >
-
-                <span>
-                  {
-                    getCardCount(
-                      card
-                    )
-                  }
-                </span>
-
-                <strong>
-                  {card}
-                </strong>
-
-              </button>
-            )
-          )
-        }
-
-      </div>
-
-
-      {/* =================================================
-          SEARCH
-      ================================================= */}
-
-      <div className="searchSection">
-
-        <label
-          htmlFor="requestSearch"
-          className="searchLabel"
-        >
-          Search Requests
-        </label>
-
-        <p className="searchHint">
-          Search by request ID,
-          student, programme, reason
-          or status.
-        </p>
-
-
-        <div className="toolbar">
+      <div className="toolbar">
+        <div className="dashboardFilterField dashboardSearchField">
+          <label htmlFor="dashboardSearch">
+            Search requests
+          </label>
 
           <input
-            id="requestSearch"
+            id="dashboardSearch"
             type="search"
-            aria-label={
-              "Search requests"
-            }
-            placeholder={
-              "For example AA-102, Medical or Programme"
-            }
             value={search}
-            onChange={
-              e =>
-                setSearch(
-                  e.target.value
-                )
-            }
+            placeholder="Request ID, student, programme, status or email"
+            onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+              setSearch(event.target.value);
+            }}
           />
+        </div>
 
+        <div className="dashboardFilterField dashboardStatusField">
+          <label htmlFor="dashboardStatus">
+            Status
+          </label>
 
+          <select
+            id="dashboardStatus"
+            value={statusFilter}
+            onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => {
+              closeActionMenu();
+              setStatusFilter(event.target.value);
+            }}
+          >
+            {cards.map(card => (
+              <option
+                key={card.label}
+                value={card.label}
+              >
+                {card.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="dashboardFilterActions">
           <button
             type="button"
-            onClick={
-              clearFilters
-            }
+            className="secondaryButton"
+            onClick={(): void => {
+              closeActionMenu();
+              setSearch("");
+              setStatusFilter("All");
+            }}
           >
             Clear filters
           </button>
-
         </div>
-
       </div>
 
-
-      {/* =================================================
-          RESULTS INFORMATION
-      ================================================= */}
-
-      <div className="resultSummary">
-
-        <strong>
-          {visible.length}
-        </strong>
-
-        {" "}
-
-        {
-          visible.length === 1
-            ? "request"
-            : "requests"
-        }
-
-        {
-          filter !== "All" &&
-          (
-            <span>
-              {" "}
-              matching{" "}
-              <strong>
-                {filter}
-              </strong>
-            </span>
-          )
-        }
-
-      </div>
-
-
-      {/* =================================================
-          LOADING
-      ================================================= */}
-
-      {
-        props.loading
-          ? (
-            <div className="loadingPanel">
-              Loading requests...
+      {props.loading ? (
+        <div className="loadingPanel" role="status">
+          Loading requests...
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="emptyState">
+          <h2>No requests found</h2>
+          <p>There are no requests matching the selected filters.</p>
+        </div>
+      ) : (
+        <>
+          <div className="resultToolbar">
+            <div className="resultSummary">
+              Showing {(page - 1) * pageSize + 1}–
+              {Math.min(page * pageSize, filteredItems.length)} of {filteredItems.length}
             </div>
-          )
-          : (
 
-            /* =============================================
-               TABLE
-            ============================================= */
+            <div className="pageSizeControl">
+              <label htmlFor="pageSize">Rows per page</label>
+              <select
+                id="pageSize"
+                value={pageSize}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
+                  setPageSize(parseInt(event.target.value, 10))
+                }
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
 
-            <div className="tableWrap">
+          <div className="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>
+                    <button type="button" className="sortButton" onClick={(): void => sort("Id")}>
+                      Request ID{sortIndicator("Id")}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sortButton" onClick={(): void => sort("Student")}>
+                      Student{sortIndicator("Student")}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="sortButton" onClick={(): void => sort("AbsenceStartDate")}>
+                      Absence Dates{sortIndicator("AbsenceStartDate")}
+                    </button>
+                  </th>
+                  <th>Reason</th>
+                  <th>
+                    <button type="button" className="sortButton" onClick={(): void => sort("Status")}>
+                      Status{sortIndicator("Status")}
+                    </button>
+                  </th>
+                  <th style={{display:"none"}}>Signatory</th>
+                  <th style={{display:"none"}}>Administrator</th>
+                  <th className="actionsHeader">Actions</th>
+                </tr>
+              </thead>
 
-              <table>
+              <tbody>
+                {pageItems.map((request: IRequest) => {
+                  const reviewAllowed = canReview(request);
+                  const isDraft = normalize(request.Status) === "draft";
 
-                <thead>
-
-                  <tr>
-
-                    <th scope="col">
-                      Request ID
-                    </th>
-
-
-                    {
-                      props.role !==
-                        "Student" &&
-                      (
-                        <th scope="col">
-                          Student
-                        </th>
-                      )
-                    }
-
-
-                    <th scope="col">
-                      Absence Dates
-                    </th>
-
-                    <th scope="col">
-                      Reason
-                    </th>
-
-                    <th scope="col">
-                      Status
-                    </th>
-
-
-                    {
-                      props.role ===
-                        "Admin" &&
-                      (
-                        <th scope="col">
-                          Signatory
-                        </th>
-                      )
-                    }
-
-
-                    <th scope="col">
-                      Actions
-                    </th>
-
-                  </tr>
-
-                </thead>
-
-
-                <tbody>
-
-                  {
-                    visible.length === 0
-                      ? (
-
-                        <tr>
-
-                          <td
-                            className="emptyResults"
-                            colSpan={
-                              props.role ===
-                                "Student"
-                                ? 5
-                                : props.role ===
-                                    "Admin"
-                                  ? 7
-                                  : 6
+                  return (
+                    <tr key={request.Id || request.Title}>
+                      <td>{request.Id ? "AA-" + request.Id : "-"}</td>
+                      <td>
+                        {request.Student
+                          ? request.Student.Title
+                          : request.Title || "-"}
+                      </td>
+                      <td>
+                        {displayDate(request.AbsenceStartDate)} – {displayDate(request.AbsenceEndDate)}
+                      </td>
+                      <td>{(request.AbsenceReasons || []).join(", ") || "-"}</td>
+                      <td>
+                        <span className={getStatusClass(request.Status)}>
+                          {request.Status || "Draft"}
+                        </span>
+                      </td>
+                      <td style={{display:"none"}}>
+                        {request.Signatory
+                          ? request.Signatory.Title || request.Signatory.EMail || "-"
+                          : "-"}
+                      </td>
+                      <td style={{display:"none"}}>{request.AdminLabel || "-"}</td>
+                      <td className="actionsCell">
+                        <div className="requestActions">
+                          <button
+                            type="button"
+                            className={
+                              openActionMenuId === request.Id
+                                ? "requestActionsButton requestActionsButtonOpen"
+                                : "requestActionsButton"
+                            }
+                            aria-haspopup="menu"
+                            aria-expanded={openActionMenuId === request.Id}
+                            aria-label={"More actions for request AA-" + (request.Id || "")}
+                            title="More actions"
+                            onClick={(event: React.MouseEvent<HTMLButtonElement>): void =>
+                              showActionMenu(event, request.Id)
                             }
                           >
+                            <span className="requestActionsDots" aria-hidden="true">
+                              ⋮
+                            </span>
+                          </button>
 
-                            <strong>
-                              No requests found
-                            </strong>
+                          {openActionMenuId === request.Id &&
+                            actionMenuPosition &&
+                            typeof document !== "undefined" &&
+                            createPortal(
+                              <div
+                                className="requestActionsMenu requestActionsMenuPortal"
+                                role="menu"
+                                aria-label={"Actions for request AA-" + (request.Id || "")}
+                                style={{
+                                  top: actionMenuPosition.top,
+                                  left: actionMenuPosition.left
+                                }}
+                                onClick={(event: React.MouseEvent<HTMLDivElement>): void => {
+                                  event.stopPropagation();
+                                }}
+                              >
+                                {reviewAllowed ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="requestActionsItem"
+                                    onClick={(): void => {
+                                      closeActionMenu();
+                                      props.onReview(request);
+                                    }}
+                                  >
+                                    <span className="requestActionsIcon" aria-hidden="true">
+                                      <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
+                                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+                                        <path d="M8 12.2l2.5 2.5L16.5 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    </span>
+                                    <span className="requestActionsLabel">
+                                      {normalize(request.Status) === "under review"
+                                        ? "Continue Review"
+                                        : "Review"}
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="requestActionsItem"
+                                    onClick={(): void => {
+                                      closeActionMenu();
+                                      props.onOpen(request);
+                                    }}
+                                  >
+                                    <span className="requestActionsIcon" aria-hidden="true">
+                                      {isDraft ? (
+                                        <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
+                                          <path d="M4 20h4l11-11a2.1 2.1 0 0 0-3-3L5 17v3Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                                          <path d="M14.5 7.5l3 3" stroke="currentColor" strokeWidth="1.7" />
+                                        </svg>
+                                      ) : (
+                                        <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
+                                          <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                                          <circle cx="12" cy="12" r="2.7" stroke="currentColor" strokeWidth="1.7" />
+                                        </svg>
+                                      )}
+                                    </span>
+                                    <span className="requestActionsLabel">
+                                      {isDraft ? "Edit" : "View"}
+                                    </span>
+                                  </button>
+                                )}
 
-                            <p>
-                              Try changing the
-                              status filter or
-                              search term.
-                            </p>
-
-                          </td>
-
-                        </tr>
-
-                      )
-                      : (
-
-                        visible.map(
-                          request => (
-
-                            <tr
-                              key={
-                                request.Id
-                              }
-                            >
-
-                              <td>
-
-                                <strong>
-                                  AA-
-                                  {
-                                    request.Id
-                                  }
-                                </strong>
-
-                              </td>
-
-
-                              {
-                                props.role !==
-                                  "Student" &&
-                                (
-                                  <td>
-
-                                    {
-                                      request
-                                        .Student
-                                        ? request
-                                            .Student
-                                            .Title
-                                        : "-"
-                                    }
-
-                                  </td>
-                                )
-                              }
-
-
-                              <td>
-
-                                {
-                                  displayDate(
-                                    request
-                                      .AbsenceStartDate
-                                  )
-                                }
-
-                                <span className="dateSeparator">
-                                  {" – "}
-                                </span>
-
-                                {
-                                  displayDate(
-                                    request
-                                      .AbsenceEndDate
-                                  )
-                                }
-
-                              </td>
-
-
-                              <td>
-
-                                {
-                                  (
-                                    request
-                                      .AbsenceReasons ||
-                                    []
-                                  ).length >
-                                    0
-                                    ? (
-                                      request
-                                        .AbsenceReasons ||
-                                      []
-                                    ).join(", ")
-                                    : "-"
-                                }
-
-                              </td>
-
-
-                              <td>
-
-                                <span
-                                  className={
-                                    getStatusClass(
-                                      request.Status
-                                    )
-                                  }
-                                >
-                                  {
-                                    request.Status ||
-                                    "Draft"
-                                  }
-                                </span>
-
-                              </td>
-
-
-                              {
-                                props.role ===
-                                  "Admin" &&
-                                (
-                                  <td>
-
-                                    {
-                                      request
-                                        .Signatory
-                                        ? request
-                                            .Signatory
-                                            .Title
-                                        : "-"
-                                    }
-
-                                  </td>
-                                )
-                              }
-
-
-                              <td>
-
-                                <div className="tableActions">
-
-                                  {props.role === "Admin" && (
+                                {(props.role === "Admin" || isDraft) && (
+                                  <>
+                                    <div className="requestActionsDivider" aria-hidden="true" />
                                     <button
                                       type="button"
-                                      onClick={() => props.onOpen(request)}
+                                      role="menuitem"
+                                      className="requestActionsItem requestActionsDelete"
+                                      onClick={(): void => {
+                                        closeActionMenu();
+                                        props.onDelete(request);
+                                      }}
                                     >
-                                      Edit
+                                      <span className="requestActionsIcon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
+                                          <path d="M4 7h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                                          <path d="M9 7V4h6v3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                                          <path d="M6 7l1 13h10l1-13" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                                          <path d="M10 11v5M14 11v5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                                        </svg>
+                                      </span>
+                                      <span className="requestActionsLabel">Delete</span>
                                     </button>
-                                  )}
+                                  </>
+                                )}
+                              </div>,
+                              document.body
+                            )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                                  {canReview(request) && (
-                                    <button
-                                      type="button"
-                                      className="tablePrimaryAction"
-                                      onClick={() => props.onReview(request)}
-                                    >
-                                      Review
-                                    </button>
-                                  )}
-
-                                  {props.role !== "Admin" && !canReview(request) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => props.onOpen(request)}
-                                    >
-                                      {request.Status === "Draft" && props.role === "Student"
-                                        ? "Edit"
-                                        : "View"}
-                                    </button>
-                                  )}
-
-                                  {((props.role === "Student" && request.Status === "Draft") ||
-                                    props.role === "Admin") && (
-                                    <button
-                                      type="button"
-                                      className="linkDanger"
-                                      onClick={() => props.onDelete(request)}
-                                    >
-                                      Delete
-                                    </button>
-                                  )}
-
-                                </div>
-
-                              </td>
-
-                            </tr>
-                          )
-                        )
-                      )
-                  }
-
-                </tbody>
-
-              </table>
-
+          <div className="paginationSection">
+            <div className="paginationSummary">
+              Page {page} of {totalPages}
             </div>
-          )
-      }
 
+            <div className="pagination">
+              <button
+                type="button"
+                className="paginationButton"
+                disabled={page <= 1}
+                onClick={(): void => setPage(page - 1)}
+              >
+                Previous
+              </button>
+
+              <button
+                type="button"
+                className="paginationButton"
+                disabled={page >= totalPages}
+                onClick={(): void => setPage(page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
+
+export default Dashboard;
