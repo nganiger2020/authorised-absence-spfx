@@ -6,6 +6,10 @@ import {
   IUserOption
 } from "../../models/Models";
 import { PeoplePicker } from "../../controls/PeoplePicker";
+import {
+  AdminManagedMetadata,
+  IAdminTermOption
+} from "../../controls/AdminManagedMetadata";
 
 
 
@@ -16,6 +20,10 @@ interface Props {
   adminMode?: boolean;
 
   userOptions?: IUserOption[];
+
+  adminOptions: IAdminTermOption[];
+
+  adminOptionsLoading?: boolean;
 
   onSearchUsers: (
     searchText: string
@@ -185,6 +193,13 @@ React.FC<Props> = (p) => {
 
         if (!r.Programme) {
           return "Enter your Programme of Study.";
+        }
+
+        if (
+          !r.AdminTermGuid ||
+          !r.AdminLabel
+        ) {
+          return "Select an Admin.";
         }
       }
 
@@ -495,7 +510,9 @@ React.FC<Props> = (p) => {
         !r.Title ||
         !r.DoB ||
         !r.LevelOfStudy ||
-        !r.Programme
+        !r.Programme ||
+        !r.AdminTermGuid ||
+        !r.AdminLabel
       ) {
         return 1;
       }
@@ -973,6 +990,41 @@ React.FC<Props> = (p) => {
               />
 
             </div>
+
+
+            <AdminManagedMetadata
+              valueLabel={
+                r.AdminLabel
+              }
+              valueTermGuid={
+                r.AdminTermGuid
+              }
+              options={
+                p.adminOptions || []
+              }
+              loading={
+                p.adminOptionsLoading
+              }
+              required
+              disabled={saving}
+              onChange={
+                (
+                  value?: IAdminTermOption
+                ): void => {
+
+                  patch({
+                    AdminLabel:
+                      value
+                        ? value.label
+                        : undefined,
+                    AdminTermGuid:
+                      value
+                        ? value.termGuid
+                        : undefined
+                  });
+                }
+              }
+            />
 
           </section>
         )
@@ -1671,6 +1723,12 @@ React.FC<Props> = (p) => {
                 <b>Programme:</b>
                 {" "}
                 {r.Programme}
+              </p>
+
+              <p>
+                <b>Admin:</b>
+                {" "}
+                {r.AdminLabel || "-"}
               </p>
 
               <button

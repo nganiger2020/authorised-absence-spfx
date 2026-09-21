@@ -4,6 +4,11 @@ import {
   IRequest,
   IUserOption
 } from "../../models/Models";
+import { PeoplePicker } from "../../controls/PeoplePicker";
+import {
+  AdminManagedMetadata,
+  IAdminTermOption
+} from "../../controls/AdminManagedMetadata";
 
 
 interface Props {
@@ -13,6 +18,21 @@ interface Props {
   adminMode?: boolean;
 
   userOptions?: IUserOption[];
+  adminOptions?: IAdminTermOption[];
+  adminOptionsLoading?: boolean;
+
+  onSearchUsers: (
+    searchText: string
+  ) => Promise<IUserOption[]>;
+
+  onResolveUser: (
+    user: IUserOption
+  ) => Promise<IUserOption>;
+
+  onAdminChange?: (
+    label?: string,
+    termGuid?: string
+  ) => Promise<void>;
 
   onSaveForLater: (
     comments: string
@@ -51,23 +71,37 @@ React.FC<Props> = (props) => {
       ""
     );
 
+  const [confirmedAbsenceReasons, setConfirmedAbsenceReasons] =
+    React.useState<string[]>(
+      props.request.AbsenceReasons || []
+    );
+
   const [error, setError] =
     React.useState<string>("");
 
   const [saving, setSaving] =
     React.useState<boolean>(false);
 
-  const [signatoryId, setSignatoryId] =
-    React.useState<number>(
-      props.request.SignatoryId || 0
+  const [selectedSignatory, setSelectedSignatory] =
+    React.useState<IUserOption | undefined>(
+      props.request.SignatoryId
+        ? {
+            Id: props.request.SignatoryId,
+            Title: props.request.Signatory ? props.request.Signatory.Title || "" : "",
+            Email: props.request.Signatory ? props.request.Signatory.EMail || "" : "",
+            LoginName: props.request.Signatory ? props.request.Signatory.LoginName || "" : ""
+          }
+        : undefined
     );
 
-  const [
-    administratorId,
-    setAdministratorId
-  ] =
-    React.useState<number>(
-      props.request.AdministratorId || 0
+  const [adminLabel, setAdminLabel] =
+    React.useState<string>(
+      props.request.AdminLabel || ""
+    );
+
+  const [adminTermGuid, setAdminTermGuid] =
+    React.useState<string>(
+      props.request.AdminTermGuid || ""
     );
 
 
@@ -273,7 +307,7 @@ React.FC<Props> = (props) => {
 
       if (
         !props.onAssignSignatory ||
-        !signatoryId
+        !selectedSignatory
       ) {
         return;
       }
@@ -285,7 +319,7 @@ React.FC<Props> = (props) => {
         setError("");
 
         await props.onAssignSignatory(
-          signatoryId
+          selectedSignatory.Id
         );
 
       } catch (err) {
@@ -315,61 +349,11 @@ React.FC<Props> = (props) => {
 
 
   /* =====================================================
-     ASSIGN ADMINISTRATOR
-     ===================================================== */
-
-  const assignAdministrator =
-    async (): Promise<void> => {
-
-      if (
-        !props.onAssignAdministrator ||
-        !administratorId
-      ) {
-        return;
-      }
-
-
-      try {
-
-        setSaving(true);
-        setError("");
-
-        await props.onAssignAdministrator(
-          administratorId
-        );
-
-      } catch (err) {
-
-        console.error(
-          "Unable to assign administrator.",
-          err
-        );
-
-        setError(
-          getErrorMessage(
-            err,
-            "Unable to assign administrator."
-          )
-        );
-
-        window.scrollTo(
-          0,
-          0
-        );
-
-      } finally {
-
-        setSaving(false);
-      }
-    };
-
-
-  /* =====================================================
      SUBMIT DECISION
      ===================================================== */
 
   const submitDecision =
-    (): void => {
+    async (): Promise<void> => {
 
       if (!decision) {
 
@@ -386,17 +370,108 @@ React.FC<Props> = (props) => {
       }
 
 
+      const absenceReasons =
+        props.request.AbsenceReasons || [];
+
+      const allReasonsConfirmed =
+        absenceReasons.every(
+          reason =>
+            confirmedAbsenceReasons.indexOf(reason) >= 0
+        );
+
       if (
-        decision === "Approve"
+        absenceReasons.length > 0 &&
+        !allReasonsConfirmed
       ) {
 
-        void approve();
+        setError(
+          "Reconfirm all Reason(s) for Absence before submitting the decision."
+        );
+
+        window.scrollTo(
+          0,
+          0
+        );
 
         return;
       }
 
 
-      void reject();
+      try {
+
+        setSaving(true);
+        setError("");
+
+        /*
+         * Save the selected Assigned Signatory as part of
+         * Submit Decision. There is intentionally no separate
+         * Save Signatory button.
+         */
+        if (
+          props.onAssignSignatory &&
+          selectedSignatory &&
+          selectedSignatory.Id !== props.request.SignatoryId
+        ) {
+          await props.onAssignSignatory(
+            selectedSignatory.Id
+          );
+        }
+
+
+        if (
+          decision === "Approve"
+        ) {
+
+          await props.onApprove(
+            comments.trim()
+          );
+
+          return;
+        }
+
+
+        if (!comments.trim()) {
+
+          setError(
+            "Enter the reason for rejecting this request."
+          );
+
+          window.scrollTo(
+            0,
+            0
+          );
+
+          return;
+        }
+
+
+        await props.onReject(
+          comments.trim()
+        );
+
+      } catch (err) {
+
+        console.error(
+          "Unable to submit decision.",
+          err
+        );
+
+        setError(
+          getErrorMessage(
+            err,
+            "Unable to submit the decision."
+          )
+        );
+
+        window.scrollTo(
+          0,
+          0
+        );
+
+      } finally {
+
+        setSaving(false);
+      }
     };
 
 
@@ -712,9 +787,61 @@ React.FC<Props> = (props) => {
                 []
               ).length > 0
                 ? (
-                    props.request.AbsenceReasons ||
-                    []
-                  ).join(", ")
+                    <fieldset className="approverReasonChecklist">
+
+                      <legend className="hint">
+                        Reconfirm the reason(s) before submitting your decision.
+                      </legend>
+
+                      {
+                        (
+                          props.request.AbsenceReasons ||
+                          []
+                        ).map(reason => (
+
+                          <label
+                            className="check"
+                            key={reason}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={
+                                confirmedAbsenceReasons.indexOf(reason) >= 0
+                              }
+                              disabled={saving}
+                              onChange={(event): void => {
+
+                                if (event.target.checked) {
+
+                                  setConfirmedAbsenceReasons(
+                                    previous =>
+                                      previous.indexOf(reason) >= 0
+                                        ? previous
+                                        : previous.concat(reason)
+                                  );
+
+                                } else {
+
+                                  setConfirmedAbsenceReasons(
+                                    previous =>
+                                      previous.filter(
+                                        item => item !== reason
+                                      )
+                                  );
+                                }
+
+                                setError("");
+                              }}
+                            />
+
+                            <span>{reason}</span>
+
+                          </label>
+                        ))
+                      }
+
+                    </fieldset>
+                  )
                 : "-"
             }
 
@@ -979,58 +1106,72 @@ React.FC<Props> = (props) => {
           Supporting Evidence
         </h2>
 
-
         {
           attachments.length === 0
             ? (
                 <div className="infoBox">
-                  No supporting evidence
-                  has been attached.
+                  No supporting evidence has been attached.
                 </div>
               )
             : (
-                <ul className="attachmentList">
+                <div className="evidenceTableWrap">
 
-                  {
-                    attachments.map(
-                      attachment => (
+                  <table className="evidenceTable">
 
-                        <li
-                          key={
-                            attachment.FileName
-                          }
-                        >
+                    <thead>
+                      <tr>
+                        <th scope="col">
+                          File Name
+                        </th>
+                        <th scope="col">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
 
-                          <div>
+                    <tbody>
 
-                            <span className="fileIcon">
-                              FILE
-                            </span>
+                      {
+                        attachments.map(
+                          (attachment, index) => (
 
-                            <a
-                              href={
-                                attachment
-                                  .ServerRelativeUrl
-                              }
-                              target="_blank"
-                              rel="noreferrer"
-                            >
+                            <tr key={attachment.FileName}>
 
-                              {
-                                attachment
-                                  .FileName
-                              }
+                              <td>
 
-                            </a>
+                                <span className="fileIcon">
+                                  FILE
+                                </span>
 
-                          </div>
+                                <span className="evidenceFileName">
+                                  {attachment.FileName}
+                                </span>
 
-                        </li>
-                      )
-                    )
-                  }
+                              </td>
 
-                </ul>
+                              <td className="evidenceActionCell">
+
+                                <a
+                                  href={attachment.ServerRelativeUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="evidenceViewLink"
+                                >
+                                  View
+                                </a>
+
+                              </td>
+
+                            </tr>
+                          )
+                        )
+                      }
+
+                    </tbody>
+
+                  </table>
+
+                </div>
               )
         }
 
@@ -1038,7 +1179,7 @@ React.FC<Props> = (props) => {
 
 
       {/* ===============================================
-          AUTHORISED SIGNATORY
+          AUTHORISED SIGNATORY / ASSIGNMENT
          =============================================== */}
 
       <div className="reviewSection">
@@ -1047,23 +1188,42 @@ React.FC<Props> = (props) => {
           Authorised Signatory
         </h2>
 
-
         <div className="reviewRow">
 
           <div className="reviewKey">
-            Assigned Signatory
+            Administrator
           </div>
 
           <div className="reviewValue">
-
             {
-              props.request.Signatory
-                ? props.request
-                    .Signatory.Title
-                : "-"
+              props.request.AdminLabel ||
+              adminLabel ||
+              "-"
             }
-
           </div>
+
+        </div>
+
+        <div className="reviewAssignmentControl">
+
+          <PeoplePicker
+            id="assignedSignatory"
+            label="Assigned Signatory"
+            required
+            value={selectedSignatory}
+            disabled={saving}
+            onSearch={props.onSearchUsers}
+            onResolve={props.onResolveUser}
+            onChange={(user?: IUserOption): void => {
+              setSelectedSignatory(user);
+              setError("");
+            }}
+          />
+
+          <p className="hint">
+            Search by name or email address. Select the
+            authorised signatory for this request.
+          </p>
 
         </div>
 
@@ -1079,160 +1239,69 @@ React.FC<Props> = (props) => {
         (
           <div className="reviewSection adminSection">
 
-            <h2>
-              Admin Assignment
-            </h2>
+            <h2>Admin Assignment</h2>
 
-            <p className="sectionIntro">
-              Administrators can reassign
-              the request at any workflow
-              stage.
-            </p>
+            <AdminManagedMetadata
+              valueLabel={adminLabel}
+              valueTermGuid={adminTermGuid}
+              options={props.adminOptions || []}
+              loading={props.adminOptionsLoading}
+              required
+              disabled={saving}
+              onChange={(value?: IAdminTermOption): void => {
+                const label = value ? value.label : "";
+                const termGuid = value ? value.termGuid : "";
+
+                setAdminLabel(label);
+                setAdminTermGuid(termGuid);
+                setError("");
+
+                if (props.onAdminChange) {
+                  void props.onAdminChange(
+                    label,
+                    termGuid
+                  );
+                }
+              }}
+            />
 
 
             <div className="formGroup">
-
-              <label htmlFor="adminSignatory">
-                Authorised Signatory
-              </label>
-
-              <select
-                id="adminSignatory"
-                value={
-                  signatoryId || ""
-                }
-                onChange={
-                  e =>
-                    setSignatoryId(
-                      Number(
-                        e.target.value
-                      ) || 0
-                    )
-                }
-              >
-
-                <option value="">
-                  Select signatory
-                </option>
+              <fieldset>
+                <legend>
+                  Reason(s) for Absence
+                  <span className="required">
+                    {" *"}
+                  </span>
+                </legend>
 
                 {
                   (
-                    props.userOptions ||
+                    props.request.AbsenceReasons ||
                     []
-                  ).map(
-                    user => (
-
-                      <option
-                        key={user.Id}
-                        value={user.Id}
-                      >
-
-                        {user.Title}
-
-                        {
-                          user.Email
-                            ? " - " +
-                              user.Email
-                            : ""
-                        }
-
-                      </option>
-                    )
-                  )
+                  ).length > 0
+                    ? (
+                        props.request.AbsenceReasons ||
+                        []
+                      ).map(reason => (
+                        <label
+                          className="check"
+                          key={reason}
+                        >
+                          <input
+                            type="checkbox"
+                            checked
+                            disabled
+                            readOnly
+                          />
+                          <span>{reason}</span>
+                        </label>
+                      ))
+                    : (
+                        <span>-</span>
+                      )
                 }
-
-              </select>
-
-
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={
-                  saving ||
-                  !signatoryId
-                }
-                onClick={
-                  () => {
-                    void assignSignatory();
-                  }
-                }
-              >
-                Save Signatory
-              </button>
-
-            </div>
-
-
-            <div className="formGroup">
-
-              <label htmlFor="adminAdministrator">
-                Administrator
-              </label>
-
-              <select
-                id="adminAdministrator"
-                value={
-                  administratorId || ""
-                }
-                onChange={
-                  e =>
-                    setAdministratorId(
-                      Number(
-                        e.target.value
-                      ) || 0
-                    )
-                }
-              >
-
-                <option value="">
-                  Select administrator
-                </option>
-
-                {
-                  (
-                    props.userOptions ||
-                    []
-                  ).map(
-                    user => (
-
-                      <option
-                        key={user.Id}
-                        value={user.Id}
-                      >
-
-                        {user.Title}
-
-                        {
-                          user.Email
-                            ? " - " +
-                              user.Email
-                            : ""
-                        }
-
-                      </option>
-                    )
-                  )
-                }
-
-              </select>
-
-
-              <button
-                type="button"
-                className="secondaryButton"
-                disabled={
-                  saving ||
-                  !administratorId
-                }
-                onClick={
-                  () => {
-                    void assignAdministrator();
-                  }
-                }
-              >
-                Save Administrator
-              </button>
-
+              </fieldset>
             </div>
 
           </div>
@@ -1418,9 +1487,9 @@ React.FC<Props> = (props) => {
             saving ||
             !decision
           }
-          onClick={
-            submitDecision
-          }
+          onClick={(): void => {
+            void submitDecision();
+          }}
         >
 
           {

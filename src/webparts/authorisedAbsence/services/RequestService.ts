@@ -8,6 +8,7 @@ import {
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
+import "@pnp/sp/fields";
 import "@pnp/sp/attachments";
 import "@pnp/sp/site-users/web";
 import "@pnp/sp/site-groups/web";
@@ -22,6 +23,12 @@ import {
 } from "../models/Models";
 
 import { AppConfig } from "../config/AppConfig";
+
+
+export interface IAdminTermOption {
+  label: string;
+  termGuid: string;
+}
 
 
 interface IPeoplePickerEntity {
@@ -631,6 +638,7 @@ export class RequestService {
       "LevelOfStudy",
       "DoB",
       "Programme",
+      "Admin",
 
       "VisaType",
       "VisaOtherComments",
@@ -693,10 +701,6 @@ export class RequestService {
       "Signatory/Title",
       "Signatory/EMail",
 
-      "AdministratorId",
-      "Administrator/Id",
-      "Administrator/Title",
-      "Administrator/EMail",
 
       "AuthorId",
       "Author/Id",
@@ -718,7 +722,6 @@ export class RequestService {
 
       "Student",
       "Signatory",
-      "Administrator",
       "Author",
       "Editor"
     ];
@@ -729,14 +732,81 @@ export class RequestService {
      NORMALISE
      ===================================================== */
 
+  private normalizeTaxonomyValue(
+    value: unknown
+  ): { label: string; termGuid: string } {
+
+    if (value === undefined || value === null) {
+      return { label: "", termGuid: "" };
+    }
+
+    if (typeof value === "object") {
+      const taxonomyValue = value as {
+        Label?: unknown;
+        TermGuid?: unknown;
+        WssId?: unknown;
+      };
+
+      const label =
+        taxonomyValue.Label !== undefined &&
+        taxonomyValue.Label !== null
+          ? String(taxonomyValue.Label).trim()
+          : "";
+
+      const termGuid =
+        taxonomyValue.TermGuid !== undefined &&
+        taxonomyValue.TermGuid !== null
+          ? String(taxonomyValue.TermGuid).trim()
+          : "";
+
+      return { label, termGuid };
+    }
+
+    let raw = String(value).trim();
+
+    if (!raw) {
+      return { label: "", termGuid: "" };
+    }
+
+    const hashIndex = raw.indexOf(";#");
+    if (hashIndex >= 0) {
+      raw = raw.substring(hashIndex + 2);
+    }
+
+    const pipeIndex = raw.lastIndexOf("|");
+    if (pipeIndex >= 0) {
+      return {
+        label: raw.substring(0, pipeIndex).trim(),
+        termGuid: raw.substring(pipeIndex + 1).trim()
+      };
+    }
+
+    return { label: raw, termGuid: "" };
+  }
+
+
   private normalizeRequest(
     request: IRequest
   ):
   IRequest {
 
+    const rawRequest =
+      request as IRequest & { Admin?: unknown };
+
+    const adminValue =
+      this.normalizeTaxonomyValue(rawRequest.Admin);
+
     return {
 
       ...request,
+
+      AdminLabel:
+        adminValue.label ||
+        request.AdminLabel || "",
+
+      AdminTermGuid:
+        adminValue.termGuid ||
+        request.AdminTermGuid || "",
 
       Title:
         request.Title || "",
@@ -797,6 +867,58 @@ export class RequestService {
   }
 
 
+  private async resolveAdminLabels(
+    requests: IRequest[]
+  ): Promise<IRequest[]> {
+
+    const needsResolution = requests.some(
+      (request: IRequest): boolean => {
+        const label = (request.AdminLabel || "").trim();
+        return !!request.AdminTermGuid &&
+          (!label || /^\d+$/.test(label));
+      }
+    );
+
+    if (!needsResolution) {
+      return requests;
+    }
+
+    let options: IAdminTermOption[] = [];
+
+    try {
+      options = await this.getAdminTerms();
+    } catch (error) {
+      console.error(
+        "Unable to resolve Admin managed metadata labels.",
+        error
+      );
+      return requests;
+    }
+
+    const labelsByGuid: { [key: string]: string } = {};
+
+    options.forEach((option: IAdminTermOption): void => {
+      if (option.termGuid) {
+        labelsByGuid[option.termGuid.toLowerCase()] = option.label || "";
+      }
+    });
+
+    return requests.map((request: IRequest): IRequest => {
+      const guid = (request.AdminTermGuid || "").trim().toLowerCase();
+      const resolvedLabel = guid ? labelsByGuid[guid] : "";
+
+      if (!resolvedLabel) {
+        return request;
+      }
+
+      return {
+        ...request,
+        AdminLabel: resolvedLabel
+      };
+    });
+  }
+
+
   /* =====================================================
      DASHBOARD
      ===================================================== */
@@ -804,80 +926,19 @@ export class RequestService {
   public async getDashboard(
     role: UserRole,
     userId: number
-  ):
-  Promise<IRequest[]> {
+  ): Promise<IRequest[]> {
 
-    if (
-      !userId
-    ) {
-
+    if (!userId) {
       throw new Error(
         "Current SharePoint user ID is required."
       );
     }
 
+    const currentUser = await this.currentUser();
+    const currentEmail = this.normalizeEmail(
+      currentUser.Email
+    );
 
-    if (
-      role === "Student"
-    ) {
-
-      const items =
-        await this.requestList
-          .items
-          .select(
-            ...this.getSelectFields()
-          )
-          .expand(
-            ...this.getExpandFields()
-          )
-          .filter(
-            "StudentId eq " +
-            userId
-          )
-          .orderBy(
-            "Modified",
-            false
-          )();
-
-
-      return this.normalizeRequests(
-        items as unknown as IRequest[]
-      );
-    }
-
-
-    if (
-      role === "Approver"
-    ) {
-
-      const items =
-        await this.requestList
-          .items
-          .select(
-            ...this.getSelectFields()
-          )
-          .expand(
-            ...this.getExpandFields()
-          )
-          .filter(
-            "SignatoryId eq " +
-            userId
-          )
-          .orderBy(
-            "Modified",
-            false
-          )();
-
-
-      return this.normalizeRequests(
-        items as unknown as IRequest[]
-      );
-    }
-
-
-    /*
-     * Admin sees all requests.
-     */
     const items =
       await this.requestList
         .items
@@ -892,12 +953,63 @@ export class RequestService {
           false
         )();
 
+    const normalizedRequests =
+      this.normalizeRequests(
+        items as unknown as IRequest[]
+      );
 
-    return this.normalizeRequests(
-      items as unknown as IRequest[]
+    const requests =
+      await this.resolveAdminLabels(
+        normalizedRequests
+      );
+
+    /*
+     * Application Admin sees every request.
+     */
+    if (role === "Admin") {
+      return requests;
+    }
+
+    /*
+     * Every other authenticated user sees:
+     *  - requests they raised;
+     *  - requests where they are Signatory;
+     *  - requests where Admin managed-metadata label
+     *    equals their email address.
+     *
+     * Admin is a taxonomy field, not a Person field.
+     */
+    return requests.filter(
+      (request: IRequest): boolean => {
+
+        const isOwner =
+          request.StudentId === userId ||
+          (!!request.Student &&
+            request.Student.Id === userId);
+
+        const isSignatory =
+          request.SignatoryId === userId ||
+          this.normalizeEmail(
+            request.Signatory &&
+            request.Signatory.EMail
+              ? request.Signatory.EMail
+              : ""
+          ) === currentEmail;
+
+        const isManagedMetadataAdmin =
+          !!currentEmail &&
+          this.normalizeEmail(
+            request.AdminLabel
+          ) === currentEmail;
+
+        return (
+          isOwner ||
+          isSignatory ||
+          isManagedMetadataAdmin
+        );
+      }
     );
   }
-
 
   /* =====================================================
      GET REQUEST
@@ -940,16 +1052,192 @@ export class RequestService {
         )();
 
 
-    return this.normalizeRequest({
+    const normalized =
+      this.normalizeRequest({
 
-      ...(
-        item as unknown as IRequest
-      ),
+        ...(
+          item as unknown as IRequest
+        ),
 
-      AttachmentFiles:
-        attachments as unknown as
-          IAttachmentInfo[]
-    });
+        AttachmentFiles:
+          attachments as unknown as
+            IAttachmentInfo[]
+      });
+
+    const resolved =
+      await this.resolveAdminLabels([
+        normalized
+      ]);
+
+    return resolved[0];
+  }
+
+
+  /* =====================================================
+     ADMIN MANAGED METADATA
+     ===================================================== */
+
+  public async getAdminTerms():
+  Promise<IAdminTermOption[]> {
+
+    const field =
+      await this.requestList.fields
+        .getByInternalNameOrTitle(
+          "Admin"
+        )();
+
+    const fieldInfo =
+      field as unknown as {
+        TermSetId?: string;
+        TypeAsString?: string;
+      };
+
+    if (
+      fieldInfo.TypeAsString &&
+      fieldInfo.TypeAsString !==
+        "TaxonomyFieldType"
+    ) {
+      throw new Error(
+        "Admin is not a single-value Managed Metadata field."
+      );
+    }
+
+    const termSetId =
+      fieldInfo.TermSetId || "";
+
+    if (!termSetId) {
+      throw new Error(
+        "The Admin managed metadata field does not have a Term Set configured."
+      );
+    }
+
+    const endpoint =
+      this.context.pageContext.web.absoluteUrl +
+      "/_api/v2.1/termStore/sets/" +
+      termSetId +
+      "/terms?$select=id,labels";
+
+    const response =
+      await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1,
+        {
+          headers: {
+            Accept: "application/json"
+          }
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "Unable to load Admin managed metadata terms."
+      );
+    }
+
+    const data =
+      await response.json() as {
+        value?: Array<{
+          id?: string;
+          labels?: Array<{
+            name?: string;
+            isDefault?: boolean;
+          }>;
+        }>;
+      };
+
+    const values =
+      data.value || [];
+
+    const options:
+      IAdminTermOption[] = [];
+
+    for (
+      let i = 0;
+      i < values.length;
+      i++
+    ) {
+
+      const labels =
+        values[i].labels || [];
+
+      let label = "";
+
+      for (
+        let j = 0;
+        j < labels.length;
+        j++
+      ) {
+
+        if (
+          labels[j].isDefault === true &&
+          labels[j].name
+        ) {
+          label =
+            labels[j].name || "";
+          break;
+        }
+      }
+
+      if (
+        !label &&
+        labels.length > 0
+      ) {
+        label =
+          labels[0].name || "";
+      }
+
+      if (
+        label &&
+        values[i].id
+      ) {
+        options.push({
+          label: label,
+          termGuid:
+            values[i].id || ""
+        });
+      }
+    }
+
+    options.sort(
+      (
+        first,
+        second
+      ) =>
+        first.label.localeCompare(
+          second.label
+        )
+    );
+
+    return options;
+  }
+
+
+  private async saveAdminTaxonomy(
+    itemId: number,
+    request: IRequest
+  ): Promise<void> {
+
+    if (
+      !request.AdminLabel ||
+      !request.AdminTermGuid
+    ) {
+      return;
+    }
+
+    await this.requestList
+      .items
+      .getById(
+        itemId
+      )
+      .validateUpdateListItem([
+        {
+          FieldName: "Admin",
+          FieldValue:
+            request.AdminLabel +
+            "|" +
+            request.AdminTermGuid
+        }
+      ]);
   }
 
 
@@ -1150,9 +1438,6 @@ export class RequestService {
           request.RequestRejectionDetails
         ),
 
-      AdministratorId:
-        request.AdministratorId ||
-        null,
 
       letterofconfirmationforauthorise:
         this.nullIfEmpty(
@@ -1198,6 +1483,12 @@ export class RequestService {
     }
 
 
+    await this.saveAdminTaxonomy(
+      result.Id,
+      request
+    );
+
+
     return result.Id;
   }
 
@@ -1231,6 +1522,12 @@ export class RequestService {
           request
         )
       );
+
+
+    await this.saveAdminTaxonomy(
+      request.Id,
+      request
+    );
   }
 
 
@@ -1705,37 +2002,147 @@ export class RequestService {
 
   public async assignAdministrator(
     requestId: number,
-    administratorId: number
-  ):
-  Promise<void> {
+    adminLabel: string,
+    adminTermGuid: string
+  ): Promise<void> {
 
-    this.validateRequestId(
-      requestId
-    );
+    this.validateRequestId(requestId);
 
+    const label =
+      adminLabel ? adminLabel.trim() : "";
 
-    if (
-      !administratorId
-    ) {
+    const termGuid =
+      adminTermGuid ? adminTermGuid.trim() : "";
 
+    if (!label || !termGuid) {
       throw new Error(
-        "An administrator is required."
+        "An administrator managed-metadata term is required."
       );
     }
 
-
     await this.requestList
       .items
-      .getById(
-        requestId
-      )
-      .update({
-
-        AdministratorId:
-          administratorId
-      });
+      .getById(requestId)
+      .validateUpdateListItem([
+        {
+          FieldName: "Admin",
+          FieldValue: label + "|" + termGuid
+        }
+      ]);
   }
 
+
+  private isReviewableStatus(
+    status?: string
+  ): boolean {
+
+    const value =
+      (status || "")
+        .trim()
+        .toLowerCase();
+
+    return (
+      value === "submitted" ||
+      value === "pending approval" ||
+      value === "under review"
+    );
+  }
+
+
+  private normalizeEmail(
+    value?: string
+  ): string {
+
+    return (value || "")
+      .trim()
+      .toLowerCase();
+  }
+
+
+  private async ensureCanReview(
+    requestId: number
+  ): Promise<void> {
+
+    this.validateRequestId(requestId);
+
+    const currentUser =
+      await this.currentUser();
+
+    const role =
+      await this.resolveRole();
+
+    const item =
+      await this.requestList
+        .items
+        .getById(requestId)
+        .select(
+          "Id",
+          "Status",
+          "Admin",
+          "SignatoryId",
+          "Signatory/Id",
+          "Signatory/EMail"
+        )
+        .expand(
+          "Signatory"
+        )();
+
+    const normalizedRequest =
+      this.normalizeRequest(
+        item as unknown as IRequest
+      );
+
+    const resolvedRequests =
+      await this.resolveAdminLabels([
+        normalizedRequest
+      ]);
+
+    const request =
+      resolvedRequests[0];
+
+    if (!this.isReviewableStatus(request.Status)) {
+      throw new Error(
+        "This request cannot be reviewed in its current status."
+      );
+    }
+
+    if (role === "Admin") {
+      return;
+    }
+
+    const currentEmail =
+      this.normalizeEmail(currentUser.Email);
+
+    const signatoryEmail =
+      this.normalizeEmail(
+        request.Signatory &&
+        request.Signatory.EMail
+          ? request.Signatory.EMail
+          : ""
+      );
+
+    const administratorEmail =
+      this.normalizeEmail(
+        request.AdminLabel
+      );
+
+    const isSignatory =
+      request.SignatoryId === currentUser.Id ||
+      (!!currentEmail &&
+        currentEmail === signatoryEmail);
+
+    const isAdministrator =
+      !!currentEmail &&
+      currentEmail === administratorEmail;
+
+    if (isSignatory || isAdministrator) {
+      return;
+    }
+
+    throw new Error(
+      "You are not authorised to review this request."
+    );
+  }
 
   /* =====================================================
      REVIEW
@@ -1749,6 +2156,8 @@ export class RequestService {
     this.validateRequestId(
       requestId
     );
+
+    await this.ensureCanReview(requestId);
 
     await this.requestList
       .items
@@ -1785,6 +2194,8 @@ export class RequestService {
       request.Id
     );
 
+    await this.ensureCanReview(request.Id);
+
     const payload:
       Record<string, unknown> = {
 
@@ -1805,13 +2216,6 @@ export class RequestService {
         request.SignatoryId;
     }
 
-    if (
-      request.AdministratorId
-    ) {
-
-      payload.AdministratorId =
-        request.AdministratorId;
-    }
 
     /*
      * There is no dedicated review-comments field
@@ -1849,6 +2253,8 @@ export class RequestService {
     this.validateRequestId(
       requestId
     );
+
+    await this.ensureCanReview(requestId);
 
     const payload:
       Record<string, unknown> = {
@@ -1903,6 +2309,8 @@ export class RequestService {
       requestId
     );
 
+
+    await this.ensureCanReview(requestId);
     await this.requestList
       .items
       .getById(
@@ -1959,6 +2367,8 @@ export class RequestService {
       requestId
     );
 
+
+    await this.ensureCanReview(requestId);
     const reason =
       comments
         ? comments.trim()
