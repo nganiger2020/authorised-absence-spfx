@@ -1,3 +1,4 @@
+import { workflowStatus } from "../../models/Workflow";
 import * as React from "react";
 import {
   IRequest,
@@ -5,14 +6,16 @@ import {
 } from "../../models/Models";
 import { PeoplePicker } from "../../controls/PeoplePicker";
 import {
-  AdminManagedMetadata,
-  IAdminTermOption
-} from "../../controls/AdminManagedMetadata";
+  AdminLookup,
+  IAdminOption
+} from "../../controls/AdminLookup";
 interface Props {
   request: IRequest;
   adminMode?: boolean;
+  assignmentMode?: boolean;
+  onSubmitAssignment?: (signatoryId: number, absenceReasonsConfirm: string[], reasonConfOtherComments: string) => Promise<void>;
   userOptions?: IUserOption[];
-  adminOptions?: IAdminTermOption[];
+  adminOptions?: IAdminOption[];
   adminOptionsLoading?: boolean;
   /** All choices configured on SharePoint AbsenceReasonsConfirm field. */
   absenceReasonOptions: string[];
@@ -24,7 +27,7 @@ interface Props {
   ) => Promise<IUserOption>;
   onAdminChange?: (
     label?: string,
-    termGuid?: string
+    id?: number
   ) => Promise<void>;
   onSaveForLater: (
     comments: string,
@@ -51,6 +54,7 @@ interface Props {
 }
 export const ReviewForm:
 React.FC<Props> = (props) => {
+  const assignmentStage = !!props.assignmentMode;
   const [decision, setDecision] =
     React.useState<string>("");
   const [comments, setComments] =
@@ -89,9 +93,9 @@ React.FC<Props> = (props) => {
     React.useState<string>(
       props.request.AdminLabel || ""
     );
-  const [adminTermGuid, setAdminTermGuid] =
-    React.useState<string>(
-      props.request.AdminTermGuid || ""
+  const [adminId, setAdminId] =
+    React.useState<number | undefined>(
+      props.request.AdminId || undefined
     );
   /* =====================================================
      DATE FORMAT
@@ -111,22 +115,6 @@ React.FC<Props> = (props) => {
       return "-";
     }
     return value;
-  };
-  const displayStatus = (
-    value?: string
-  ): string => {
-    const status =
-      (value || "")
-        .trim()
-        .toLowerCase();
-    if (
-      status === "submitted" ||
-      status === "pending approval" ||
-      status === "under review"
-    ) {
-      return "Under Review";
-    }
-    return value || "Under Review";
   };
   /* =====================================================
      ERROR MESSAGE
@@ -272,6 +260,32 @@ React.FC<Props> = (props) => {
      ===================================================== */
   const submitDecision =
     async (): Promise<void> => {
+      if (assignmentStage) {
+        if (confirmedAbsenceReasons.length === 0) {
+          setError("Select at least one Reason for Absence.");
+          return;
+        }
+        if (confirmedAbsenceReasons.indexOf("Other") >= 0 && !reasonConfOtherComments.trim()) {
+          setError("Enter details for the Other reason.");
+          return;
+        }
+        if (!props.onSubmitAssignment) {
+          setError("The Signatory assignment handler is not configured. Update AuthorisedAbsenceApp.tsx to pass onSubmitAssignment.");
+          return;
+        }
+        if (!selectedSignatory || !selectedSignatory.Id) {
+          setError("Select an Authorised Signatory.");
+          return;
+        }
+        try {
+          setSaving(true);
+          setError("");
+          await props.onSubmitAssignment(selectedSignatory.Id, confirmedAbsenceReasons.slice(), reasonConfOtherComments);
+        } catch (err) {
+          setError(getErrorMessage(err, "Unable to submit the Signatory assignment."));
+        } finally { setSaving(false); }
+        return;
+      }
       if (!decision) {
         setError(
           "Select Approve or Reject."
@@ -306,18 +320,13 @@ React.FC<Props> = (props) => {
         window.scrollTo(0, 0);
         return;
       }
-      if (!comments.trim()) {
+      if (decision === "Reject" && !comments.trim()) {
         setError("Enter comments about your decision.");
         window.scrollTo(0, 0);
         return;
       }
-      if (!adminLabel.trim() || !adminTermGuid.trim()) {
+      if (!adminLabel.trim() || !adminId) {
         setError("An administrator must be selected before submitting a decision.");
-        window.scrollTo(0, 0);
-        return;
-      }
-      if ((props.request.AttachmentFiles || []).length === 0) {
-        setError("At least one supporting evidence file is required. Return the request to the student to add evidence.");
         window.scrollTo(0, 0);
         return;
       }
@@ -404,7 +413,7 @@ React.FC<Props> = (props) => {
       <div className="aaHeader">
         <div>
           <h1>
-            Review Authorised Absence
+            {assignmentStage ? "Assign Authorised Signatory" : "Review Authorised Absence"}
           </h1>
           <p className="pageIntro">
             Review the student's request,
@@ -416,8 +425,8 @@ React.FC<Props> = (props) => {
         <div>
           <span className="pill statusReview">
             {
-              displayStatus(
-                props.request.Status
+              workflowStatus(
+                props.request
               )
             }
           </span>
@@ -743,43 +752,6 @@ React.FC<Props> = (props) => {
         }
       </div>
       {/* ===============================================
-          CONFIRMATION LETTER
-         =============================================== */}
-      <div className="reviewSection">
-        <h2>
-          Confirmation Letter
-        </h2>
-        <div className="reviewRow">
-          <div className="reviewKey">
-            Letter Required
-          </div>
-          <div className="reviewValue">
-            {
-              displayValue(
-                props.request
-                  .letterofconfirmationforauthorise
-              )
-            }
-          </div>
-        </div>
-        {
-          props.request.letterofconfirmationforauthorise === "Yes" &&
-          (
-            <div className="reviewRow">
-              <div className="reviewKey">
-                Reason for Letter
-              </div>
-              <div className="reviewValue">
-                {
-                  props.request
-                    .Reasonforrequestingaletter || "—"
-                }
-              </div>
-            </div>
-          )
-        }
-      </div>
-      {/* ===============================================
           SUPPORTING EVIDENCE
          =============================================== */}
       <div className="reviewSection">
@@ -864,7 +836,7 @@ React.FC<Props> = (props) => {
             label="Assigned Signatory"
             required
             value={selectedSignatory}
-            disabled={saving}
+            disabled={saving || !assignmentStage}
             onSearch={props.onSearchUsers}
             onResolve={props.onResolveUser}
             onChange={(user?: IUserOption): void => {
@@ -882,27 +854,27 @@ React.FC<Props> = (props) => {
           ADMIN ASSIGNMENT
          =============================================== */}
       {
-        props.adminMode &&
+        props.adminMode && assignmentStage &&
         (
           <div className="reviewSection adminSection">
             <h2>Admin Assignment</h2>
-            <AdminManagedMetadata
+            <AdminLookup
               valueLabel={adminLabel}
-              valueTermGuid={adminTermGuid}
+              valueId={adminId}
               options={props.adminOptions || []}
               loading={props.adminOptionsLoading}
               required
               disabled={saving}
-              onChange={(value?: IAdminTermOption): void => {
+              onChange={(value?: IAdminOption): void => {
                 const label = value ? value.label : "";
-                const termGuid = value ? value.termGuid : "";
+                const id = value ? value.id : undefined;
                 setAdminLabel(label);
-                setAdminTermGuid(termGuid);
+                setAdminId(id);
                 setError("");
                 if (props.onAdminChange) {
                   void props.onAdminChange(
                     label,
-                    termGuid
+                    id
                   );
                 }
               }}
@@ -913,6 +885,7 @@ React.FC<Props> = (props) => {
       {/* ===============================================
           DECISION
          =============================================== */}
+      {!assignmentStage && (
       <div className="reviewSection decisionSection">
         <h2>
           Signatory Decision
@@ -976,7 +949,7 @@ React.FC<Props> = (props) => {
           <label htmlFor="decisionComments">
             Comments
             {
-              true &&
+              decision === "Reject" &&
               (
                 <span className="required">
                   {" *"}
@@ -993,7 +966,7 @@ React.FC<Props> = (props) => {
           </label>
           <textarea
             id="decisionComments"
-            required
+            required={decision === "Reject"}
             rows={6}
             value={comments}
             onChange={
@@ -1005,6 +978,7 @@ React.FC<Props> = (props) => {
           />
         </div>
       </div>
+      )}
       {/* ===============================================
           ACTIONS
          =============================================== */}
@@ -1019,6 +993,7 @@ React.FC<Props> = (props) => {
         >
           Back to Dashboard
         </button>
+        {!assignmentStage && (
         <button
           type="button"
           className="secondaryButton"
@@ -1035,28 +1010,24 @@ React.FC<Props> = (props) => {
               : "Save for Later"
           }
         </button>
+        )}
         <button
           type="button"
           className="primary"
           disabled={
             saving ||
-            !decision
+            (!assignmentStage && !decision)
           }
           onClick={(): void => {
             void submitDecision();
           }}
         >
           {
-            saving
-              ? "Saving..."
-              : decision === "Reject"
-                ? "Reject Request"
-                : decision === "Approve"
-                  ? "Approve Request"
-                  : "Submit Decision"
+            saving ? "Saving..." : assignmentStage ? "Submit to Authorised Signatory" : decision === "Reject" ? "Reject Request" : "Approve Request"
           }
         </button>
       </div>
     </div>
   );
 };
+

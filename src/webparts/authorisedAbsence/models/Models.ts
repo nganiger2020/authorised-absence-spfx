@@ -180,26 +180,11 @@ export interface IRequest {
   Programme?: string;
 
 
-  /* =====================================================
-     ADMINISTRATOR
-
-     SharePoint field:
-     Admin
-
-     Field type:
-     Single-value Managed Metadata
-
-     AdminLabel:
-     Selected taxonomy term display label.
-
-     AdminTermGuid:
-     Selected taxonomy term GUID.
-     ===================================================== */
-
+  /** Single-value Admin lookup to the Admins list. Email is used for workflow routing. */
+  AdminId?: number;
   AdminLabel?: string;
-
-  AdminTermGuid?: string;
-
+  AdminTitle?: string;
+  Admin?: { Id: number; Title?: string; Email?: string };
 
   /* =====================================================
      VISA DETAILS
@@ -351,7 +336,7 @@ export interface IRequest {
      Metadata Admin field represented by:
 
        AdminLabel
-       AdminTermGuid
+       AdminId
      ===================================================== */
 
   AdministratorId?: number;
@@ -399,7 +384,7 @@ export const emptyRequest = (): IRequest => ({
 
   AdminLabel: "",
 
-  AdminTermGuid: "",
+  AdminId: undefined,
 
   AbsenceReasons: [],
 

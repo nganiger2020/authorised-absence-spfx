@@ -1,0 +1,2 @@
+<!-- Replace source-list GUID before provisioning. Existing Admin taxonomy requires migration first. -->
+<Field Type="Lookup" Name="Admin" StaticName="Admin" DisplayName="Admin" List="{REPLACE-WITH-ADMINS-LIST-GUID}" ShowField="Title" Required="FALSE" Mult="FALSE" />

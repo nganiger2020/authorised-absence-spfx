@@ -273,12 +273,10 @@
         {
             "InternalName": "Admin",
             "Title": "Admin",
-            "TypeAsString": "TaxonomyFieldType"
-        },
-        {
-            "InternalName": "gc2b7af94580497c85cd58674c10864e",
-            "Title": "Admin_0",
-            "TypeAsString": "Note"
+            "TypeAsString": "Lookup",
+            "LookupList": "Admins",
+            "LookupField": "Title",
+            "AllowMultipleValues": false
         },
         {
             "InternalName": "TaxCatchAll",
@@ -654,6 +652,11 @@
             "InternalName": "_CommentCount",
             "Title": "Comment count",
             "TypeAsString": "Lookup"
+        },
+        {
+            "InternalName": "SelectedAdmin",
+            "Title": "SelectedAdmin",
+            "TypeAsString": "Text"
         }
     ]
 }
