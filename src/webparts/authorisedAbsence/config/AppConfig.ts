@@ -1,5 +1,7 @@
 export const AppConfig = {
 
+  adminsListTitle: "Admins",
+
   requestsListTitle:
     "Authorised Absence Requests",
 
@@ -17,6 +19,7 @@ export const AppConfig = {
     ".docx",
     ".jpg",
     ".jpeg",
-    ".png"
+    ".png",
+    ".eml"
   ]
 };

@@ -1,0 +1,254 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authorised Absence — Administrator action required</title>
+</head>
+
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,Helvetica,sans-serif;color:#0d0d0d;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+        style="background-color:#f5f5f5;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+                    style="width:100%;max-width:640px;background-color:#ffffff;">
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color:#0d0d0d;padding:26px 32px;border-bottom:5px solid #dcc266;">
+                            <p style="margin:0 0 10px;color:#dcc266;font-size:14px;letter-spacing:1px;">
+                                UNIVERSITY OF BIRMINGHAM
+                            </p>
+                            <h1 style="margin:0;color:#ffffff;font-size:26px;line-height:34px;">
+                                Authorised Absence
+                            </h1>
+                            <p style="margin:8px 0 0;color:#ffffff;font-size:15px;">
+                                Administrator action required
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding:30px 32px;font-size:15px;line-height:24px;">
+
+                            <p style="margin:0 0 18px;">
+                                Dear @{triggerOutputs()?['body/SelectedAdmin']},
+                            </p>
+
+                            <p style="margin:0 0 22px;">
+                                A student has submitted an authorised absence request
+                                that requires your attention.
+                                Please review the information provided, confirm the
+                                relevant absence details and assign the appropriate
+                                Authorised Signatory for review and decision.
+                            </p>
+
+                            <!-- Request Details -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                                style="border:1px solid #dddddd;border-collapse:collapse;font-size:14px;line-height:21px;">
+
+                                <tr>
+                                    <th colspan="2" align="left"
+                                        style="padding:12px 16px;background-color:#faf6e8;border-bottom:1px solid #dcc266;font-size:16px;color:#0d0d0d;">
+                                        Request details
+                                    </th>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" align="left" width="34%"
+                                        style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        Reference
+                                    </th>
+                                    <td style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        AA-@{triggerOutputs()?['body/ID']}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" align="left"
+                                        style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        Student
+                                    </th>
+                                    <td style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        @{triggerOutputs()?['body/Student/DisplayName']}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" align="left"
+                                        style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        Student ID
+                                    </th>
+                                    <td style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        @{triggerOutputs()?['body/Title']}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" align="left"
+                                        style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        Absence period
+                                    </th>
+                                    <td style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        @{formatDateTime(triggerOutputs()?['body/AbsenceStartDate'], 'dd/MM/yyyy')}
+                                        to
+                                        @{formatDateTime(triggerOutputs()?['body/AbsenceEndDate'], 'dd/MM/yyyy')}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" align="left"
+                                        style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        Reason(s)
+                                    </th>
+                                    <td style="padding:10px 16px;border-bottom:1px solid #eeeeee;">
+                                        @{triggerOutputs()?['body/SelectedReason']}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row" align="left" style="padding:10px 16px;">
+                                        Status
+                                    </th>
+                                    <td style="padding:10px 16px;">
+                                        Under Review with Administrator
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Instructions -->
+                            <h2 style="margin:28px 0 12px;font-size:19px;line-height:26px;color:#0d0d0d;">
+                                What you need to do
+                            </h2>
+
+                            <p style="margin:0 0 12px;">
+                                Please complete the following steps to prepare
+                                the request for the Authorised Signatory:
+                            </p>
+
+                            <ol style="margin:0 0 24px;padding-left:24px;line-height:24px;">
+
+                                <li style="padding-bottom:10px;">
+                                    Review the student's submitted information,
+                                    including the absence dates and any
+                                    supporting evidence.
+                                </li>
+
+                                <li style="padding-bottom:10px;">
+                                    Select the appropriate
+                                    <strong>Authorised Signatory</strong>
+                                    responsible for reviewing and making
+                                    a decision on the request.
+                                </li>
+
+                                <li style="padding-bottom:10px;">
+                                    Review and confirm the
+                                    <strong>reason(s) for absence</strong>
+                                    selected by the student.
+                                    Update the selection where necessary.
+                                </li>
+
+                                <li style="padding-bottom:10px;">
+                                    Select the applicable
+                                    <strong>absence monitoring conditions</strong>,
+                                    where required.
+                                    The Authorised Signatory will review and
+                                    validate these conditions at the next stage.
+                                </li>
+
+                                <li>
+                                    Click
+                                    <strong>Submit to Authorised Signatory</strong>
+                                    to forward the request for a decision.
+                                </li>
+                            </ol>
+
+                            <!-- Next Steps -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                                style="border-collapse:collapse;margin:0 0 26px;">
+                                <tr>
+                                    <td style="background-color:#faf6e8;border-left:4px solid #dcc266;padding:16px 18px;">
+
+                                        <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0d0d0d;">
+                                            What happens next?
+                                        </p>
+
+                                        <p style="margin:0 0 10px;font-size:14px;line-height:22px;">
+                                            Once submitted, the request will be
+                                            forwarded to the selected
+                                            <strong>Authorised Signatory</strong>
+                                            for review and a decision to approve
+                                            or reject the absence.
+                                        </p>
+
+                                        <p style="margin:0;font-size:14px;line-height:22px;">
+                                            You will receive an email notification
+                                            confirming the Signatory's decision
+                                            once the review has been completed.
+                                        </p>
+
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Action Button -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td bgcolor="#0d0d0d" style="border-radius:28px;">
+                                        <a href="@{variables('S1URL')}"
+                                            style="display:inline-block;padding:14px 26px;border:1px solid #0d0d0d;border-radius:28px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;">
+                                            Review request and assign Signatory
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Fallback Link -->
+                            <p style="margin:18px 0 0;font-size:12px;line-height:19px;color:#555555;">
+                                If the button does not work, copy and paste the
+                                following link into your browser:
+                            </p>
+
+                            <p style="margin:6px 0 0;font-size:12px;line-height:19px;">
+                                <a href="@{variables('S1URL')}"
+                                    style="color:#0d0d0d;word-break:break-all;text-decoration:underline;">
+                                    @{variables('S1URL')}
+                                </a>
+                            </p>
+
+                            <!-- Signature -->
+                            <p style="margin:28px 0 0;">
+                                Kind regards,<br>
+                                <strong>Registry - Authorised Absence Team</strong>
+                            </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding:20px 32px;background-color:#f0f0f0;border-top:3px solid #dcc266;font-size:12px;line-height:19px;color:#555555;">
+
+                            <p style="margin:0 0 6px;font-weight:bold;color:#0d0d0d;">
+                                University of Birmingham | Registry - Authorised Absence
+                            </p>
+
+                            <p style="margin:0;">
+                                This is an automated notification.
+                                Please use the Authorised Absence application
+                                to review and update the request.
+                            </p>
+
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
