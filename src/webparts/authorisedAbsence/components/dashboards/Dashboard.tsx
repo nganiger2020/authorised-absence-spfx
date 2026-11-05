@@ -1,3 +1,6 @@
+import { SearchableSelect } from "../../controls/SearchableSelect";
+import { ColumnFilter } from "../../controls/ColumnFilter";
+import { ColumnKey, CheckboxFilters, columns, columnValues, matchesCheckboxFilters, compareColumn } from "../../models/DashboardColumnFilters";
 import { matchesDashboardSearch } from "../../models/DashboardSearch";
 import { canOpenWorkflow, workflowStatus } from "../../models/Workflow";
 import * as React from "react";
@@ -16,11 +19,7 @@ interface Props {
   onReview: (request: IRequest) => void;
   onDelete: (request: IRequest) => void;
 }
-type SortField =
-  | "Id"
-  | "Student"
-  | "AbsenceStartDate"
-  | "Status";
+type SortField = ColumnKey;
 type SortDirection = "asc" | "desc";
 const normalize = (value?: string): string =>
   (value || "").trim().toLowerCase();
@@ -65,6 +64,7 @@ const getStatusClass = (status?: string): string => {
   }
 };
 export const Dashboard: React.FC<Props> = (props) => {
+  const [columnFilters, setColumnFilters] = React.useState<CheckboxFilters>({});
   const [search, setSearch] = React.useState<string>("");
   const [statusFilter, setStatusFilter] = React.useState<string>("All");
   const [sortField, setSortField] = React.useState<SortField>("Id");
@@ -177,40 +177,20 @@ export const Dashboard: React.FC<Props> = (props) => {
       } else if (statusFilter !== "All") {
         statusMatches = normalize(workflowStatus(request)) === normalize(statusFilter);
       }
-      if (!statusMatches || !matchesDashboardSearch(request, search)) {
+      if (!statusMatches || !matchesDashboardSearch(request, search) || !matchesCheckboxFilters(request, columnFilters)) {
         return false;
       }
       return true;
     });
     result.sort((a: IRequest, b: IRequest): number => {
-      let first: string | number = "";
-      let second: string | number = "";
-      if (sortField === "Id") {
-        first = a.Id || 0;
-        second = b.Id || 0;
-      } else if (sortField === "Student") {
-        first = a.Student ? a.Student.Title || "" : "";
-        second = b.Student ? b.Student.Title || "" : "";
-      } else if (sortField === "AbsenceStartDate") {
-        first = a.AbsenceStartDate || "";
-        second = b.AbsenceStartDate || "";
-      } else {
-        first = a.Status || "";
-        second = b.Status || "";
-      }
-      let comparison = 0;
-      if (typeof first === "number" && typeof second === "number") {
-        comparison = first - second;
-      } else {
-        comparison = String(first).localeCompare(String(second));
-      }
+      const comparison = compareColumn(a, b, sortField);
       return sortDirection === "asc" ? comparison : -comparison;
     });
     return result;
-  }, [props.items, statusFilter, sortField, sortDirection, search]);
+  }, [props.items, statusFilter, sortField, sortDirection, search, columnFilters]);
   React.useEffect(() => {
     setPage(1);
-  }, [statusFilter, pageSize, search]);
+  }, [statusFilter, pageSize, search, columnFilters]);
   const totalPages = Math.max(
     1,
     Math.ceil(filteredItems.length / pageSize)
@@ -234,7 +214,7 @@ export const Dashboard: React.FC<Props> = (props) => {
   };
   const sortIndicator = (field: SortField): string => {
     if (sortField !== field) {
-      return "";
+      return " ↕";
     }
     return sortDirection === "asc" ? " ▲" : " ▼";
   };
@@ -358,10 +338,10 @@ export const Dashboard: React.FC<Props> = (props) => {
         </div>
         <div className="dashboardFilterField dashboardStatusField">
           <label htmlFor="dashboardStatus">Status</label>
-          <select id="dashboardStatus" value={statusFilter} aria-controls="dashboardRequests"
-            onChange={event => { closeActionMenu(); setStatusFilter(event.target.value); }}>
+          <SearchableSelect id="dashboardStatus" value={statusFilter} aria-controls="dashboardRequests"
+            onValueChange={selectedValue => { closeActionMenu(); setStatusFilter(selectedValue); }}>
             {cards.map(card => <option key={card.label} value={card.label}>{card.label}</option>)}
-          </select>
+          </SearchableSelect>
         </div>
         <div className="dashboardFilterActions">
           <button
@@ -369,6 +349,7 @@ export const Dashboard: React.FC<Props> = (props) => {
             className="secondaryButton"
             onClick={(): void => {
               closeActionMenu();
+              setColumnFilters({});
               setSearch("");
               setStatusFilter("All");
             }}
@@ -390,78 +371,51 @@ export const Dashboard: React.FC<Props> = (props) => {
             </div>
             <div className="pageSizeControl">
               <label htmlFor="pageSize">Rows per page</label>
-              <select
+              <SearchableSelect
                 id="pageSize"
                 value={pageSize}
-                onChange={(event: React.ChangeEvent<HTMLSelectElement>): void =>
-                  setPageSize(parseInt(event.target.value, 10))
+                onValueChange={(selectedValue: string): void =>
+                  setPageSize(parseInt(selectedValue, 10))
                 }
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
-              </select>
+              </SearchableSelect>
             </div>
           </div>
           <div className="tableWrap">
             <table id="dashboardRequests" aria-label="Authorised absence requests">
               <thead>
                 <tr>
-                  <th scope="col" aria-sort={sortField === "Id" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
-                    <button type="button" className="sortButton" onClick={(): void => sort("Id")}>
-                      Request ID{sortIndicator("Id")}
-                    </button>
-                  </th>
-                  <th scope="col" aria-sort={sortField === "Student" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
-                    <button type="button" className="sortButton" onClick={(): void => sort("Student")}>
-                      Student{sortIndicator("Student")}
-                    </button>
-                  </th>
-                  <th scope="col" aria-sort={sortField === "AbsenceStartDate" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
-                    <button type="button" className="sortButton" onClick={(): void => sort("AbsenceStartDate")}>
-                      Absence Dates{sortIndicator("AbsenceStartDate")}
-                    </button>
-                  </th>
-                  <th scope="col">Reason</th>
-                  <th scope="col" aria-sort={sortField === "Status" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
-                    <button type="button" className="sortButton" onClick={(): void => sort("Status")}>
-                      Status{sortIndicator("Status")}
-                    </button>
-                  </th>
-                  <th scope="col">Signatory</th>
-                  <th scope="col">Administrator</th>
-                  <th className="actionsHeader">Actions</th>
+                  {columns.map(column => {
+                    const values: string[] = [];
+                    props.items.forEach(item => columnValues(item, column.key).forEach(value => { if (values.indexOf(value) < 0) { values.push(value); } }));
+                    values.sort((first, second) => first.localeCompare(second, undefined, { numeric: true, sensitivity: "base" }));
+                    return <th key={column.key} scope="col" aria-sort={sortField === column.key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+                      <div className="columnHeaderControls">
+                        <button type="button" className="sortButton"
+                          aria-label={"Sort " + column.label + (sortField === column.key && sortDirection === "asc" ? " descending" : " ascending")}
+                          onClick={() => sort(column.key)}>
+                          <span>{column.label}</span>
+                          <span className={"dashboardSortIcon" + (sortField === column.key ? " isSorted" : "")} aria-hidden="true">{sortIndicator(column.key)}</span>
+                        </button>
+                        <ColumnFilter label={column.label} values={values} selected={columnFilters[column.key]}
+                          onApply={selected => { closeActionMenu(); setColumnFilters(current => ({ ...current, [column.key]: selected })); }} />
+                      </div>
+                    </th>;
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {pageItems.length === 0 && <tr><td colSpan={8} role="status">No requests match the selected filters.</td></tr>}
+                {pageItems.length === 0 && <tr><td colSpan={7} role="status">No requests match the selected filters.</td></tr>}
                 {pageItems.map((request: IRequest) => {
                   const reviewAllowed = canReview(request);
                   const isDraft = normalize(request.Status) === "draft";
                   return (
                     <tr key={request.Id || request.Title}>
-                      <td>{request.Id ? "AA-" + request.Id : "-"}</td>
-                      <td>
-                        {request.Student
-                          ? request.Student.Title
-                          : request.Title || "-"}
-                      </td>
-                      <td>
-                        {displayDate(request.AbsenceStartDate)} – {displayDate(request.AbsenceEndDate)}
-                      </td>
-                      <td>{(request.AbsenceReasons || []).join(", ") || "-"}</td>
-                      <td>
-                        <span className={getStatusClass(request.Status)}>
-                          {workflowStatus(request)}
-                        </span>
-                      </td>
-                      <td >
-                        {request.Signatory
-                          ? request.Signatory.Title || request.Signatory.EMail || "-"
-                          : "-"}
-                      </td>
-                      <td><span className="dashboardPerson">{request.AdminTitle || request.AdminLabel || "-"}</span>{request.AdminTitle && request.AdminLabel && <span className="dashboardPersonEmail">{request.AdminLabel}</span>}</td>
-                      <td className="actionsCell">
+                      <td className="requestIdCell"><div className="requestIdWithActions"><span>{request.Id ? "AA-" + request.Id : "-"}</span>
+
                         <div className="requestActions">
                           <button
                             type="button"
@@ -576,7 +530,29 @@ export const Dashboard: React.FC<Props> = (props) => {
                               document.body
                             )}
                         </div>
+
+                      </div></td>
+                      <td>
+                        {request.Student
+                          ? request.Student.Title
+                          : request.Title || "-"}
                       </td>
+                      <td>
+                        {displayDate(request.AbsenceStartDate)} – {displayDate(request.AbsenceEndDate)}
+                      </td>
+                      <td>{(request.AbsenceReasons || []).join(", ") || "-"}</td>
+                      <td className="dashboardStatusCell">
+                        <span className={getStatusClass(request.Status)}>
+                          {workflowStatus(request)}
+                        </span>
+                      </td>
+                      <td >
+                        {request.Signatory
+                          ? request.Signatory.Title || request.Signatory.EMail || "-"
+                          : "-"}
+                      </td>
+                      <td><span className="dashboardPerson">{request.AdminTitle || request.AdminLabel || "-"}</span>{request.AdminTitle && request.AdminLabel && <span className="dashboardPersonEmail">{request.AdminLabel}</span>}</td>
+
                     </tr>
                   );
                 })}
@@ -612,4 +588,5 @@ export const Dashboard: React.FC<Props> = (props) => {
   );
 };
 export default Dashboard;
+
 

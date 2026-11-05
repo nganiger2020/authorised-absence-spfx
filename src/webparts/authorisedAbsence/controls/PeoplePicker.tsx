@@ -850,6 +850,7 @@ React.FC<Props> = (
                     key={key}
                     type="button"
                     className="peoplePickerOption"
+                    aria-pressed={!!props.value && ((!!user.Id && props.value.Id === user.Id) || (!!user.Email && props.value.Email === user.Email))}
                     disabled={
                       resolving
                     }
@@ -863,6 +864,7 @@ React.FC<Props> = (
                     }
                   >
 
+                    <span className="aaPeopleCheckbox" aria-hidden="true">{props.value && ((!!user.Id && props.value.Id === user.Id) || (!!user.Email && props.value.Email === user.Email)) ? "☑" : "☐"}</span>
                     <span
                       className="peoplePickerAvatar"
                     >

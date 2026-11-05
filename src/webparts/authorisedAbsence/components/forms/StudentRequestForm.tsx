@@ -1,3 +1,4 @@
+import { SearchableSelect } from "../../controls/SearchableSelect";
 import { AppConfig } from "../../config/AppConfig";
 import { requiresEvidence, isAllowedEvidenceName } from "../../models/Evidence";
 import * as React from "react";
@@ -1122,7 +1123,7 @@ React.FC<Props> = (
                   {" *"}
                 </span>
               </label>
-              <select
+              <SearchableSelect
                 id="levelOfStudy"
                 value={
                   request.LevelOfStudy ||
@@ -1133,11 +1134,11 @@ React.FC<Props> = (
                     "LevelOfStudy"
                   )
                 }
-                onChange={
-                  event => {
+                onValueChange={
+                  selectedValue => {
                     update({
                       LevelOfStudy:
-                        event.target.value
+                        selectedValue
                     });
                     clearFieldError(
                       "LevelOfStudy"
@@ -1157,7 +1158,7 @@ React.FC<Props> = (
                 <option value="Postgraduate Research">
                   Postgraduate Research
                 </option>
-              </select>
+              </SearchableSelect>
               {
                 getFieldError(
                   "LevelOfStudy"
@@ -1496,7 +1497,7 @@ React.FC<Props> = (
                 {" *"}
               </span>
             </label>
-            <select
+            <SearchableSelect
               id="travelOutside"
               value={
                 request.TravelOutside ||
@@ -1507,10 +1508,10 @@ React.FC<Props> = (
                   "TravelOutside"
                 )
               }
-              onChange={
-                event => {
+              onValueChange={
+                selectedValue => {
                   const value =
-                    event.target.value;
+                    selectedValue;
                   update({
                     TravelOutside:
                       value,
@@ -1542,7 +1543,7 @@ React.FC<Props> = (
               <option value="No">
                 No
               </option>
-            </select>
+            </SearchableSelect>
             {
               getFieldError(
                 "TravelOutside"

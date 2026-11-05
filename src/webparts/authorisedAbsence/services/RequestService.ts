@@ -807,14 +807,14 @@ export class RequestService {
       id: row.Id, label: (row.Email || "").trim(), title: (row.Title || "").trim(), email: (row.Email || "").trim()
     }));
   }
-  private async validateAdminSelection(request: IRequest): Promise<void> {
-    if (request.AdminId === undefined || request.AdminId === null || request.AdminId === 0) { return; }
-    if (!Number.isInteger(request.AdminId) || request.AdminId <= 0) { throw new Error("Select a valid Admin."); }
-    const admin = await this.sp.web.lists.getByTitle(AppConfig.adminsListTitle).items.getById(request.AdminId)
+  private async validateAdminSelection(request: IRequest): Promise<IRequest> {
+    const snapshot: IRequest = { ...request };
+    if (snapshot.AdminId === undefined || snapshot.AdminId === null || snapshot.AdminId === 0) { return snapshot; }
+    if (!Number.isInteger(snapshot.AdminId) || snapshot.AdminId <= 0) { throw new Error("Select a valid Admin."); }
+    const admin = await this.sp.web.lists.getByTitle(AppConfig.adminsListTitle).items.getById(snapshot.AdminId)
       .select("Id", "Title", "Email")();
     if (!(admin.Email || "").trim()) { throw new Error("The selected Admin must have an Email in the Admins list."); }
-    request.AdminLabel = admin.Email.trim();
-    request.AdminTitle = admin.Title || "";
+    return { ...snapshot, AdminLabel: admin.Email.trim(), AdminTitle: admin.Title || "" };
   }
   /* =====================================================
      PAYLOAD
@@ -994,13 +994,13 @@ export class RequestService {
   ):
   Promise<number> {
     // Always resolve the email from the selected Admins lookup item before writing.
-    await this.validateAdminSelection(request);
+    const resolvedRequest = await this.validateAdminSelection(request);
     const result =
       await this.requestList
         .items
         .add(
           this.buildPayload(
-            request
+            resolvedRequest
           )
         );
     if (
@@ -1020,22 +1020,23 @@ export class RequestService {
     request: IRequest
   ):
   Promise<void> {
+    const requestId = request.Id;
     if (
-      !request.Id
+      !requestId
     ) {
       throw new Error(
         "Request ID is required."
       );
     }
-    await this.validateAdminSelection(request);
+    const resolvedRequest = await this.validateAdminSelection(request);
     await this.requestList
       .items
       .getById(
-        request.Id
+        requestId
       )
       .update(
         this.buildPayload(
-          request
+          resolvedRequest
         )
       );
 
@@ -1212,13 +1213,13 @@ export class RequestService {
     deletedFiles: string[]
   ):
   Promise<IRequest> {
-    await this.validateAdminSelection(request);
+    const resolvedRequest = await this.validateAdminSelection(request);
     (files || []).forEach(file => this.validateAttachment(file));
     const draft:
       IRequest = {
-        ...request,
+        ...resolvedRequest,
         Stage:
-          request.Stage ||
+          resolvedRequest.Stage ||
           "Student",
         Status:
           "Draft"
@@ -1255,20 +1256,20 @@ export class RequestService {
     deletedFiles: string[]
   ):
   Promise<IRequest> {
-    await this.validateAdminSelection(request);
+    const resolvedRequest = await this.validateAdminSelection(request);
     (files || []).forEach(file => this.validateAttachment(file));
     let id =
-      request.Id;
+      resolvedRequest.Id;
     if (
       id
     ) {
       await this.update(
-        request
+        resolvedRequest
       );
     } else {
       id =
         await this.create(
-          request
+          resolvedRequest
         );
     }
     await this.processAttachments(
@@ -1299,24 +1300,24 @@ export class RequestService {
      SUBMIT
      ===================================================== */
   public async submit(request: IRequest, files: File[], deletedFiles: string[]): Promise<IRequest> {
-    await this.validateAdminSelection(request);
-    if (!request.StudentId || !request.Title.trim()) { throw new Error("Student and Student ID are required."); }
-    if (!(request.AdminLabel || "").trim() || !request.AdminId) {
+    const resolvedRequest = await this.validateAdminSelection(request);
+    if (!resolvedRequest.StudentId || !resolvedRequest.Title.trim()) { throw new Error("Student and Student ID are required."); }
+    if (!(resolvedRequest.AdminLabel || "").trim() || !resolvedRequest.AdminId) {
       throw new Error("Select an Administrator before submitting.");
     }
     (files || []).forEach(file => this.validateAttachment(file));
-    let existingAttachments = request.AttachmentFiles || [];
-    if (request.Id) {
-      const current = await this.get(request.Id);
+    let existingAttachments = resolvedRequest.AttachmentFiles || [];
+    if (resolvedRequest.Id) {
+      const current = await this.get(resolvedRequest.Id);
       existingAttachments = current.AttachmentFiles || [];
       if ((current.Status || "").toLowerCase() !== "draft") { throw new Error("Only a draft can be submitted by the student."); }
     }
     const retainedEvidence = existingAttachments.filter(file =>
       (deletedFiles || []).indexOf(file.FileName) < 0 && isAllowedEvidenceName(file.FileName));
-    if (requiresEvidence(request.AbsenceReasons) && retainedEvidence.length + (files || []).length === 0) {
+    if (requiresEvidence(resolvedRequest.AbsenceReasons) && retainedEvidence.length + (files || []).length === 0) {
       throw new Error("Supporting evidence is required for medical, family illness, bereavement and conference absence.");
     }
-    const submitted: IRequest = { ...request, Stage: "Student", Status: "Draft", SignatoryId: undefined, Signatory: undefined,
+    const submitted: IRequest = { ...resolvedRequest, Stage: "Student", Status: "Draft", SignatoryId: undefined, Signatory: undefined,
       AbsenceReasonsConfirm: [], ReasonConfOtherComments: "" };
     let id = submitted.Id;
     if (id) { await this.update(submitted); } else { id = await this.create(submitted); }
@@ -1353,8 +1354,8 @@ export class RequestService {
     await this.ensureCanAssign(requestId);
     if (!adminId) { throw new Error("Select an Admin."); }
     const selection = { AdminId: adminId, AdminLabel: adminLabel } as IRequest;
-    await this.validateAdminSelection(selection);
-    await this.requestList.items.getById(requestId).update({ AdminId: adminId, SelectedAdmin: selection.AdminLabel });
+    const resolvedSelection = await this.validateAdminSelection(selection);
+    await this.requestList.items.getById(requestId).update({ AdminId: adminId, SelectedAdmin: resolvedSelection.AdminLabel });
   }
   private isReviewableStatus(
     status?: string
@@ -1668,4 +1669,5 @@ export class RequestService {
     return fallback;
   }
 }
+
 

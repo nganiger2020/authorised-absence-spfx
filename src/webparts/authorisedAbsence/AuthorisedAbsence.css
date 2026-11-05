@@ -5069,3 +5069,101 @@ button {
 @media (max-width: 540px) {
   .authorisedAbsenceApp .uobDashboard .cards { grid-template-columns: repeat(2, minmax(0, 148px)); gap: 10px; }
 }
+
+/* Column filter icons and checkbox popups (portal avoids table clipping). */
+.authorisedAbsenceApp .uobDashboard .columnHeaderControls { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.authorisedAbsenceApp .uobDashboard .columnFilterButton { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 30px; height: 30px; padding: 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: #575757; cursor: pointer; }
+.authorisedAbsenceApp .uobDashboard .columnFilterButton:hover { background: #e4e4df; border-color: #bdbdb7; }
+.authorisedAbsenceApp .uobDashboard .columnFilterButton.isFiltered { background: #1b1b1b; color: #fff; border-color: #1b1b1b; }
+.aaColumnFilterPopup { position: fixed; z-index: 100000; display: flex; flex-direction: column; box-sizing: border-box; padding: 0; border: 1px solid #c9c9c3; border-radius: 7px; background: #fff; color: #242424; box-shadow: 0 8px 28px #0003; font: 13px/1.45 "Manrope", Arial, sans-serif; overflow: hidden; text-align: left; }
+.aaFilterTitle { padding: 12px 14px; font-weight: 700; background: #f5f5f2; border-bottom: 1px solid #e1e1dc; }
+.aaFilterAll { display: flex; gap: 9px; align-items: center; padding: 10px 14px; font-weight: 600; border-bottom: 1px solid #e1e1dc; }
+.aaFilterValues { overflow-y: auto; flex: 1 1 auto; min-height: 0; padding: 4px 0; }
+.aaFilterValues label { display: flex; align-items: flex-start; gap: 9px; padding: 8px 14px; cursor: pointer; overflow-wrap: anywhere; }
+.aaFilterValues label:hover { background: #f3f3ef; }
+.aaColumnFilterPopup input[type="checkbox"] { accent-color: #6b0c35; flex: 0 0 auto; margin: 3px 0 0; width: 15px; height: 15px; }
+.aaFilterFooter { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid #e1e1dc; }
+.aaFilterFooter button { padding: 7px 14px; border: 1px solid #aaa; border-radius: 4px; background: #fff; color: #242424; font: inherit; cursor: pointer; }
+.aaFilterFooter .aaFilterApply { background: #1b1b1b; color: #fff; border-color: #1b1b1b; }
+.aaColumnFilterPopup :is(input, button):focus-visible { outline: 2px solid #1b1b1b; outline-offset: 2px; }
+
+/* Request actions belong to the Request ID cell. */
+.authorisedAbsenceApp .uobDashboard .requestIdWithActions { display: flex; align-items: center; justify-content: space-between; gap: 10px; white-space: nowrap; }
+.authorisedAbsenceApp .uobDashboard .requestIdWithActions .requestActions { display: inline-flex; flex-shrink: 0; margin: 0; }
+.authorisedAbsenceApp .uobDashboard .requestIdCell { min-width: 125px; }
+
+/* Compact, tidy dashboard status column. */
+.authorisedAbsenceApp .uobDashboard .tableWrap .dashboardStatusCell {
+  min-width: 145px;
+  max-width: 190px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.authorisedAbsenceApp .uobDashboard .dashboardStatusCell .pill {
+  display: inline-block;
+  box-sizing: border-box;
+  max-width: 175px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  text-align: left;
+  vertical-align: middle;
+}
+
+/* Always show sorting affordances on all data-column headings. */
+.authorisedAbsenceApp .uobDashboard .columnHeaderControls .sortButton { gap: 6px; min-width: 0; }
+.authorisedAbsenceApp .uobDashboard .dashboardSortIcon { display: inline-block; flex-shrink: 0; min-width: 14px; color: #656565; font-size: 15px; line-height: 1; font-family: Arial, sans-serif; }
+.authorisedAbsenceApp .uobDashboard .dashboardSortIcon.isSorted { color: #1b1b1b; font-weight: 700; }
+
+/* Searchable dropdowns with single checkbox selection. */
+.authorisedAbsenceApp .aaSingleSelect { width: 100%; min-width: 0; }
+.authorisedAbsenceApp .aaSingleSelectTrigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; box-sizing: border-box; width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #8a8886; border-radius: 4px; background: #fff; color: #242424; text-align: left; font: inherit; font-weight: normal; cursor: pointer; }
+.authorisedAbsenceApp .aaSingleSelectTrigger > span:first-child { overflow-wrap: anywhere; }
+.authorisedAbsenceApp .aaSingleSelectTrigger:disabled { opacity: .6; cursor: default; }
+.authorisedAbsenceApp .uobDashboard #dashboardStatus.aaSingleSelectTrigger { height: auto; min-height: 52px; }
+.authorisedAbsenceApp .uobDashboard .pageSizeControl .aaSingleSelect { width: 85px; }
+.authorisedAbsenceApp .uobDashboard .pageSizeControl .aaSingleSelectTrigger { min-height: 34px; padding: 5px 10px; }
+.aaSingleSelectPopup { position: fixed; z-index: 100001; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; border: 1px solid #aaa; border-radius: 5px; background: #fff; color: #242424; box-shadow: 0 8px 24px #0003; font: 14px/1.45 "Manrope", Arial, sans-serif; }
+.aaSingleSelectSearch { padding: 10px; border-bottom: 1px solid #ddd; }
+.aaSingleSelectSearch input { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid #8a8886; border-radius: 3px; font: inherit; }
+.aaSingleSelectOptions { overflow-y: auto; min-height: 0; padding: 4px 0; }
+.aaSingleSelectOptions label { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; cursor: pointer; overflow-wrap: anywhere; }
+.aaSingleSelectOptions label:hover, .aaSingleSelectOptions .isSelected { background: #eef3f8; }
+.aaSingleSelectOptions input[type="checkbox"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; accent-color: #6b0c35; }
+.aaSingleSelectOptions label:has(input:disabled) { opacity: .55; cursor: default; }
+.aaSingleSelectOptions p { padding: 8px 12px; }
+.aaSingleSelectPopup input:focus-visible, .authorisedAbsenceApp .aaSingleSelectTrigger:focus-visible { outline: 2px solid #1b1b1b; outline-offset: 2px; }
+.authorisedAbsenceApp .aaPeopleCheckbox { font-size: 22px; line-height: 1; color: #6b0c35; flex-shrink: 0; }
+
+/* Dropdown triggers match the existing text fields. */
+.authorisedAbsenceApp :is(.formPage, .review) .aaSingleSelect {
+  width: 100%; max-width: 700px; margin-top: 7px;
+}
+.authorisedAbsenceApp :is(.formPage, .review) .aaSingleSelectTrigger {
+  box-sizing: border-box; width: 100%; min-height: 42px; margin: 0;
+  padding: 9px 11px; border: 2px solid #555; border-radius: 2px;
+  background: #fff; color: #1f1f1f; font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px; font-weight: 400; line-height: normal; text-transform: none;
+  box-shadow: none; letter-spacing: normal;
+}
+.authorisedAbsenceApp :is(.formPage, .review) .aaSingleSelectTrigger:hover:not(:disabled) {
+  background: #fff; color: #1f1f1f; border-color: #555; box-shadow: none;
+}
+.authorisedAbsenceApp .uobDashboard #dashboardStatus.aaSingleSelectTrigger {
+  height: 52px; min-height: 52px; padding: 10px 14px; border: 2px solid #535d61;
+  border-radius: 0; background: #fff; color: #1b1b1b; font-size: 16px;
+  font-weight: 400; box-shadow: none; line-height: normal;
+}
+.authorisedAbsenceApp .uobDashboard #dashboardStatus.aaSingleSelectTrigger:hover:not(:disabled) {
+  background: #fff; color: #1b1b1b; border-color: #535d61;
+}
+.authorisedAbsenceApp .uobDashboard .pageSizeControl .aaSingleSelectTrigger {
+  border: 1px solid #bdbdb7; border-radius: 5px; background: #fff; color: #1b1b1b;
+  font-size: 14px; font-weight: 400; box-shadow: none;
+}
+.aaSingleSelectSearch input { min-height: 42px; padding: 9px 11px; border: 2px solid #555; border-radius: 2px; background: #fff; color: #1f1f1f; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
