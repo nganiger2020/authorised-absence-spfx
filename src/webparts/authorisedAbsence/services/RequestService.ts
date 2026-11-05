@@ -1,5 +1,5 @@
 import { requiresEvidence, isAllowedEvidenceName } from "../models/Evidence";
-import { canAssignSignatory, canDecideRequest, canOpenWorkflow, workflowStatus } from "../models/Workflow";
+import { canAssignSignatory, canDecideRequest, canOpenWorkflow, canWithdrawRequest, canReassignAdministrator, canReassignSignatory, workflowStatus } from "../models/Workflow";
 import { SPFI } from "@pnp/sp";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import {
@@ -22,6 +22,7 @@ import {
   UserRole
 } from "../models/Models";
 import { AppConfig } from "../config/AppConfig";
+import { IFormChoiceOptions } from "../models/ChoiceOptions";
 export interface IAdminOption {
   label: string;
   id: number;
@@ -503,8 +504,6 @@ export class RequestService {
       "AbsenceMonitoringDetails",
       "RequestApproved",
       "RequestRejectionDetails",
-      "letterofconfirmationforauthorise",
-      "Reasonforrequestingaletter",
       "Created",
       "Modified",
       "Attachments",
@@ -551,9 +550,9 @@ export class RequestService {
       Title:
         request.Title || "",
       Stage:
-        request.Stage || "Student",
+        (request.Stage || "").trim().toLowerCase() === "approved" ? "Supported" : request.Stage || "Student",
       Status:
-        request.Status || "Draft",
+        (request.Status || "").trim().toLowerCase() === "approved" ? "Supported" : request.Status || "Draft",
       AbsenceReasons:
         request.AbsenceReasons
           ? request.AbsenceReasons.slice()
@@ -714,74 +713,30 @@ export class RequestService {
   /* =====================================================
      ABSENCE REASONS CHOICES
      ===================================================== */
-  public async getAbsenceReasonsChoices():
-  Promise<string[]> {
-    try {
-      const field =
-        await this.requestList.fields
-          .getByInternalNameOrTitle(
-            "AbsenceReasons"
-          )();
-      const fieldInfo =
-        field as unknown as {
-          Choices?: string[];
-          TypeAsString?: string;
-        };
-      if (
-        fieldInfo.TypeAsString &&
-        fieldInfo.TypeAsString !== "MultiChoice" &&
-        fieldInfo.TypeAsString !== "Choice"
-      ) {
-        throw new Error(
-          "AbsenceReasons must be a SharePoint Choice or MultiChoice field."
-        );
-      }
-      return fieldInfo.Choices
-        ? fieldInfo.Choices.slice()
-        : [];
-    } catch (error) {
-      console.error(
-        "Unable to load AbsenceReasons choices.",
-        error
-      );
-      throw error;
+  public async getAbsenceReasonsChoices(): Promise<string[]> {
+    return this.getColumnChoices("AbsenceReasons");
+  }
+  public async getColumnChoices(internalName: string): Promise<string[]> {
+    const field = await this.requestList.fields.getByInternalNameOrTitle(internalName).select("TypeAsString", "Choices")() as {
+      TypeAsString?: string; Choices?: string[] | { results?: string[] };
+    };
+    if (field.TypeAsString !== "Choice" && field.TypeAsString !== "MultiChoice") {
+      throw new Error(internalName + " must be a SharePoint Choice or MultiChoice column.");
     }
+    const choices = Array.isArray(field.Choices) ? field.Choices : (field.Choices && field.Choices.results) || [];
+    return choices.filter((choice, index) => !!choice.trim() && choices.indexOf(choice) === index);
+  }
+  public async getFormChoiceOptions(): Promise<IFormChoiceOptions> {
+    const [LevelOfStudy, TravelOutside, Status] = await Promise.all([
+      this.getColumnChoices("LevelOfStudy"), this.getColumnChoices("TravelOutside"), this.getColumnChoices("Status")
+    ]);
+    return { LevelOfStudy, TravelOutside, Status };
   }
   /* =====================================================
      ABSENCE REASONS CONFIRM CHOICES
      ===================================================== */
-  public async getAbsenceReasonsConfirmChoices():
-  Promise<string[]> {
-    try {
-      const field =
-        await this.requestList.fields
-          .getByInternalNameOrTitle(
-            "AbsenceReasonsConfirm"
-          )();
-      const fieldInfo =
-        field as unknown as {
-          Choices?: string[];
-          TypeAsString?: string;
-        };
-      if (
-        fieldInfo.TypeAsString &&
-        fieldInfo.TypeAsString !== "MultiChoice" &&
-        fieldInfo.TypeAsString !== "Choice"
-      ) {
-        throw new Error(
-          "AbsenceReasonsConfirm must be a SharePoint Choice or MultiChoice field."
-        );
-      }
-      return fieldInfo.Choices
-        ? fieldInfo.Choices.slice()
-        : [];
-    } catch (error) {
-      console.error(
-        "Unable to load AbsenceReasonsConfirm choices.",
-        error
-      );
-      throw error;
-    }
+  public async getAbsenceReasonsConfirmChoices(): Promise<string[]> {
+    return this.getColumnChoices("AbsenceReasonsConfirm");
   }
   /* =====================================================
      ADMIN LOOKUP
@@ -973,16 +928,6 @@ export class RequestService {
       RequestRejectionDetails:
         this.nullIfEmpty(
           request.RequestRejectionDetails
-        ),
-      letterofconfirmationforauthorise:
-        this.nullIfEmpty(
-          request
-            .letterofconfirmationforauthorise
-        ),
-      Reasonforrequestingaletter:
-        this.nullIfEmpty(
-          request
-            .Reasonforrequestingaletter
         )
     };
   }
@@ -1027,6 +972,10 @@ export class RequestService {
       throw new Error(
         "Request ID is required."
       );
+    }
+    const current = await this.get(requestId);
+    if (workflowStatus(current) === "Withdrawn") {
+      throw new Error("A withdrawn request cannot be edited or resubmitted.");
     }
     const resolvedRequest = await this.validateAdminSelection(request);
     await this.requestList
@@ -1315,7 +1264,7 @@ export class RequestService {
     const retainedEvidence = existingAttachments.filter(file =>
       (deletedFiles || []).indexOf(file.FileName) < 0 && isAllowedEvidenceName(file.FileName));
     if (requiresEvidence(resolvedRequest.AbsenceReasons) && retainedEvidence.length + (files || []).length === 0) {
-      throw new Error("Supporting evidence is required for medical, family illness, bereavement and conference absence.");
+      throw new Error("Supporting evidence is required for medical, family illness, bereavement, conference and Other absence reasons.");
     }
     const submitted: IRequest = { ...resolvedRequest, Stage: "Student", Status: "Draft", SignatoryId: undefined, Signatory: undefined,
       AbsenceReasonsConfirm: [], ReasonConfOtherComments: "" };
@@ -1330,12 +1279,12 @@ export class RequestService {
      ASSIGN SIGNATORY
      ===================================================== */
   public async assignSignatory(requestId: number, signatoryId: number): Promise<void> {
-    await this.ensureCanAssign(requestId);
+    const assignmentGuard = await this.ensureCanAssign(requestId);
     if (!signatoryId) { throw new Error("Select an Authorised Signatory."); }
-    await this.requestList.items.getById(requestId).update({ SignatoryId: signatoryId });
+    await this.requestList.items.getById(requestId).update({ SignatoryId: signatoryId }, assignmentGuard.etag);
   }
   public async submitSignatoryAssignment(requestId: number, signatoryId: number, absenceReasonsConfirm: string[], reasonConfOtherComments: string): Promise<IRequest> {
-    await this.ensureCanAssign(requestId);
+    const assignmentGuard = await this.ensureCanAssign(requestId);
     if (!signatoryId) { throw new Error("Select an Authorised Signatory."); }
     if (!absenceReasonsConfirm || absenceReasonsConfirm.length === 0) { throw new Error("Select at least one Reason for Absence."); }
     if (absenceReasonsConfirm.indexOf("Other") >= 0 && !reasonConfOtherComments.trim()) { throw new Error("Enter details for the Other reason."); }
@@ -1344,18 +1293,69 @@ export class RequestService {
     await this.requestList.items.getById(requestId).update({ WorkflowHistory: await this.historyPayload(requestId, "Signatory assigned", "Assigned to " + (signatory.Title || signatory.Email)), SignatoryId: signatoryId, Stage: "Signatory", Status: "Under Review with Signatory",
       SelectedReason: absenceReasonsConfirm.join(", "),
       AbsenceReasonsConfirm: absenceReasonsConfirm.slice(),
-      ReasonConfOtherComments: absenceReasonsConfirm.indexOf("Other") >= 0 ? this.nullIfEmpty(reasonConfOtherComments) : null });
+      ReasonConfOtherComments: absenceReasonsConfirm.indexOf("Other") >= 0 ? this.nullIfEmpty(reasonConfOtherComments) : null }, assignmentGuard.etag);
     return this.get(requestId);
   }
   /* =====================================================
      ASSIGN ADMINISTRATOR
      ===================================================== */
   public async assignAdministrator(requestId: number, adminLabel: string, adminId: number): Promise<void> {
-    await this.ensureCanAssign(requestId);
-    if (!adminId) { throw new Error("Select an Admin."); }
-    const selection = { AdminId: adminId, AdminLabel: adminLabel } as IRequest;
-    const resolvedSelection = await this.validateAdminSelection(selection);
-    await this.requestList.items.getById(requestId).update({ AdminId: adminId, SelectedAdmin: resolvedSelection.AdminLabel });
+    await this.reassignAdministrator(requestId, adminId, "Request routed to the wrong administrative team.");
+  }
+  private async getReassignmentSnapshot(requestId: number): Promise<{ request: IRequest; history: IRequestHistoryEntry[]; etag: string }> {
+    this.validateRequestId(requestId);
+    const endpoint = this.context.pageContext.web.absoluteUrl + "/_api/web/lists/getByTitle('" +
+      encodeURIComponent(AppConfig.requestsListTitle.replace(/'/g, "''")) + "')/items(" + requestId +
+      ")?$select=Id,Title,StudentId,Stage,Status,AdminId,Admin/Id,Admin/Title,Admin/Email,SignatoryId,Signatory/Id,Signatory/Title,Signatory/EMail,AbsenceReasons,WorkflowHistory&$expand=Admin,Signatory";
+    const response = await this.context.spHttpClient.get(endpoint, SPHttpClient.configurations.v1,
+      { headers: { Accept: "application/json;odata=verbose", "odata-version": "" } });
+    if (!response.ok) { throw new Error("Unable to load the request for reassignment. Check your access and try again."); }
+    type Snapshot = IRequest & { WorkflowHistory?: string; __metadata?: { etag?: string } };
+    const data = await response.json() as Snapshot & { d?: Snapshot };
+    const raw = data.d || data;
+    const etag = response.headers.get("ETag") || (raw.__metadata && raw.__metadata.etag);
+    if (!etag) { throw new Error("Unable to verify the request version. Refresh and try again."); }
+    const reasons = raw.AbsenceReasons as unknown as string[] | { results?: string[] } | undefined;
+    const request = this.normalizeRequest({ ...raw, AbsenceReasons: Array.isArray(reasons) ? reasons : (reasons && reasons.results) || [] });
+    const history: unknown = raw.WorkflowHistory ? JSON.parse(raw.WorkflowHistory) : [];
+    if (!Array.isArray(history)) { throw new Error("The request history is invalid. Contact the administrator."); }
+    return { request, history: history as IRequestHistoryEntry[], etag };
+  }
+  private async applyReassignment(requestId: number, payload: Record<string, unknown>, etag: string): Promise<IRequest> {
+    try { await this.requestList.items.getById(requestId).update(payload, etag); }
+    catch (error) {
+      if ((error as { status?: number }).status === 412) { throw new Error("The request changed during reassignment. Refresh and try again."); }
+      throw error;
+    }
+    return this.get(requestId);
+  }
+  public async reassignAdministrator(requestId: number, adminId: number, reason: string): Promise<IRequest> {
+    const [snapshot, user, role] = await Promise.all([this.getReassignmentSnapshot(requestId), this.currentUser(), this.resolveRole()]);
+    if (!canReassignAdministrator(snapshot.request, role, user.Email, user.Id)) { throw new Error("Only authorised staff assigned to an active request can reassign it."); }
+    if (!adminId || !(reason || "").trim()) { throw new Error("Select an administrative team and enter a reason for reassignment."); }
+    if (snapshot.request.AdminId === adminId) { throw new Error("This request is already assigned to that administrative team."); }
+    const target = await this.validateAdminSelection({ AdminId: adminId } as IRequest);
+    const entry: IRequestHistoryEntry = { action: "Administrator reassigned", actor: user.Title || user.Email, actorEmail: user.Email,
+      date: new Date().toISOString(), details: "From " + (snapshot.request.AdminLabel || "unassigned") + " to " + target.AdminLabel + ". Reason: " + reason.trim() };
+    return this.applyReassignment(requestId, { AdminId: adminId, SelectedAdmin: target.AdminLabel, Stage: "Administrator", Status: "Under Review with Administrator",
+      SignatoryId: null, AbsenceReasonsConfirm: [], ReasonConfOtherComments: null,
+      SelectedReason: (snapshot.request.AbsenceReasons || []).join(", "), RequestApproved: null, RequestRejectionDetails: null,
+      WorkflowHistory: JSON.stringify(snapshot.history.concat([entry])) }, snapshot.etag);
+  }
+  public async reassignSignatory(requestId: number, signatoryId: number, reason: string): Promise<IRequest> {
+    const [snapshot, user, role] = await Promise.all([this.getReassignmentSnapshot(requestId), this.currentUser(), this.resolveRole()]);
+    if (!canReassignSignatory(snapshot.request, role, user.Email, user.Id)) { throw new Error("Only authorised staff assigned to an active signatory review can reassign the signatory."); }
+    if (!Number.isInteger(signatoryId) || signatoryId <= 0 || !(reason || "").trim()) { throw new Error("Select a signatory and enter a reason for reassignment."); }
+    if (snapshot.request.SignatoryId === signatoryId) { throw new Error("This request is already assigned to that signatory."); }
+    const target = await this.sp.web.siteUsers.getById(signatoryId)();
+    if (!(target.Email || "").trim()) { throw new Error("The new signatory must have an email address."); }
+    const previous = snapshot.request.Signatory;
+    const previousLabel = previous ? [previous.Title, previous.EMail].filter(Boolean).join(" — ") : "unassigned";
+    const entry: IRequestHistoryEntry = { action: "Signatory reassigned", actor: user.Title || user.Email, actorEmail: user.Email,
+      date: new Date().toISOString(), details: "From " + previousLabel +
+        " to " + [target.Title, target.Email].filter(Boolean).join(" — ") + ". Reason: " + reason.trim() };
+    return this.applyReassignment(requestId, { SignatoryId: signatoryId, Stage: "Signatory", Status: "Under Review with Signatory",
+      RequestApproved: null, RequestRejectionDetails: null, WorkflowHistory: JSON.stringify(snapshot.history.concat([entry])) }, snapshot.etag);
   }
   private isReviewableStatus(
     status?: string
@@ -1386,19 +1386,21 @@ export class RequestService {
       throw new Error("You are not authorised to act on this request at its current stage.");
     }
   }
-  private async ensureCanAssign(requestId: number): Promise<void> {
+  private async ensureCanAssign(requestId: number): Promise<{ etag: string }> {
     this.validateRequestId(requestId);
-    const [request, user, role] = await Promise.all([this.get(requestId), this.currentUser(), this.resolveRole()]);
-    if (!this.isReviewableStatus(request.Status) || !canAssignSignatory(request, role, user.Email)) {
+    const [snapshot, user, role] = await Promise.all([this.getReassignmentSnapshot(requestId), this.currentUser(), this.resolveRole()]);
+    if (!this.isReviewableStatus(snapshot.request.Status) || !canAssignSignatory(snapshot.request, role, user.Email)) {
       throw new Error("Only the Administrator can assign a signatory during the Administrator stage.");
     }
+    return { etag: snapshot.etag };
   }
-  private async ensureCanDecide(requestId: number): Promise<void> {
+  private async ensureCanDecide(requestId: number): Promise<{ etag: string }> {
     this.validateRequestId(requestId);
-    const [request, user] = await Promise.all([this.get(requestId), this.currentUser()]);
-    if (!this.isReviewableStatus(request.Status) || !canDecideRequest(request, user.Email, user.Id)) {
+    const [snapshot, user] = await Promise.all([this.getReassignmentSnapshot(requestId), this.currentUser()]);
+    if (!this.isReviewableStatus(snapshot.request.Status) || !canDecideRequest(snapshot.request, user.Email, user.Id)) {
       throw new Error("Only the assigned Authorised Signatory can make the final decision.");
     }
+    return { etag: snapshot.etag };
   }
   /* =====================================================
      REVIEW
@@ -1422,7 +1424,7 @@ export class RequestService {
     this.validateRequestId(
       request.Id
     );
-    await this.ensureCanDecide(request.Id);
+    const decisionGuard = await this.ensureCanDecide(request.Id);
     const payload:
       Record<string, unknown> = {
         Stage:
@@ -1460,7 +1462,7 @@ export class RequestService {
       )
       .update(
         payload
-      );
+      , decisionGuard.etag);
   }
   public async saveReviewForLater(
     requestId: number,
@@ -1470,7 +1472,7 @@ export class RequestService {
     this.validateRequestId(
       requestId
     );
-    await this.ensureCanDecide(requestId);
+    const decisionGuard = await this.ensureCanDecide(requestId);
     if (signatoryId) {
       const current = await this.get(requestId);
       if (signatoryId !== current.SignatoryId) { throw new Error("The Signatory cannot be changed during final review."); }
@@ -1489,7 +1491,7 @@ export class RequestService {
       )
       .update(
         payload
-      );
+      , decisionGuard.etag);
   }
   public async approve(
     request: IRequest | number,
@@ -1510,23 +1512,23 @@ export class RequestService {
     this.validateRequestId(
       requestId
     );
-    await this.ensureCanDecide(requestId);
+    const decisionGuard = await this.ensureCanDecide(requestId);
     await this.requestList
       .items
       .getById(
         requestId
       )
       .update({
-        WorkflowHistory: await this.historyPayload(requestId, "Request approved", (comments || "").trim()),
+        WorkflowHistory: await this.historyPayload(requestId, "Request supported", (comments || "").trim()),
         Stage:
-          "Approved",
+          "Supported",
         Status:
-          "Approved",
+          "Supported",
         RequestApproved:
           "Yes",
         RequestRejectionDetails:
           null
-      });
+      }, decisionGuard.etag);
     if (
       comments &&
       comments.trim()
@@ -1555,7 +1557,7 @@ export class RequestService {
     this.validateRequestId(
       requestId
     );
-    await this.ensureCanDecide(requestId);
+    const decisionGuard = await this.ensureCanDecide(requestId);
     const reason =
       comments
         ? comments.trim()
@@ -1582,11 +1584,47 @@ export class RequestService {
           "No",
         RequestRejectionDetails:
           reason
-      });
+      }, decisionGuard.etag);
   }
   /* =====================================================
      DELETE / RECYCLE
      ===================================================== */
+  /** Keep the request and attachments; close the workflow and record the student's action. */
+  public async withdraw(requestId: number): Promise<IRequest> {
+    this.validateRequestId(requestId);
+    const user = await this.currentUser();
+    const item = this.requestList.items.getById(requestId);
+    type Snapshot = {
+      Id: number; StudentId?: number; Status?: string; WorkflowHistory?: string;
+      "odata.etag"?: string; "@odata.etag"?: string; __metadata?: { etag?: string };
+    };
+    const endpoint = this.context.pageContext.web.absoluteUrl + "/_api/web/lists/getByTitle('" +
+      encodeURIComponent(AppConfig.requestsListTitle.replace(/'/g, "''")) + "')/items(" + requestId + ")?$select=Id,StudentId,Status,WorkflowHistory";
+    const response = await this.context.spHttpClient.get(endpoint, SPHttpClient.configurations.v1,
+      { headers: { Accept: "application/json;odata=verbose", "odata-version": "" } });
+    if (!response.ok) { throw new Error("Unable to load the request for withdrawal. Check your access and try again."); }
+    const data = await response.json() as Snapshot & { d?: Snapshot };
+    const current = data.d || data;
+    if (!canWithdrawRequest(current as IRequest, user.Id)) {
+      throw new Error((current.Status || "").trim().toLowerCase() === "withdrawn"
+        ? "This request has already been withdrawn." : "Only the student named on this request can withdraw it.");
+    }
+    const etag = response.headers.get("ETag") || current["odata.etag"] || current["@odata.etag"] || (current.__metadata && current.__metadata.etag);
+    if (!etag) { throw new Error("Unable to verify the current request version. Refresh and try again."); }
+    const history: unknown = current.WorkflowHistory ? JSON.parse(current.WorkflowHistory) : [];
+    if (!Array.isArray(history)) { throw new Error("The request history is invalid. Contact the administrator."); }
+    const entries = history as IRequestHistoryEntry[];
+    const entry: IRequestHistoryEntry = { action: "Request withdrawn", actor: user.Title || user.Email,
+      actorEmail: user.Email, date: new Date().toISOString(), details: "Withdrawn by the student. Previous status: " + (current.Status || "Draft") };
+    try {
+      await item.update({ Status: "Withdrawn", Stage: "Completed", RequestApproved: null,
+        WorkflowHistory: JSON.stringify(entries.concat([entry])) }, etag);
+    } catch (error) {
+      if ((error as { status?: number }).status === 412) { throw new Error("The request changed while you were withdrawing it. Refresh and try again."); }
+      throw error;
+    }
+    return this.get(requestId);
+  }
   public async recycle(
     requestId: number
   ):

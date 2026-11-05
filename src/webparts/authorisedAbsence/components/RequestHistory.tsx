@@ -24,18 +24,21 @@ export const RequestHistory: React.FC<Props> = ({ service, requestId }) => {
   };
   const orderedEntries = entries.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const actionLabel = (entry: IRequestHistoryEntry): React.ReactNode => {
+    if (entry.action === "Administrator reassigned") { return <React.Fragment>Administrative team reassigned by <strong>{entry.actor}</strong></React.Fragment>; }
+    if (entry.action === "Signatory reassigned") { return <React.Fragment>Signatory reassigned by <strong>{entry.actor}</strong></React.Fragment>; }
+    if (entry.action === "Request withdrawn") { return <React.Fragment>Withdrawn by <strong>{entry.actor}</strong></React.Fragment>; }
     if (entry.action === "Request submitted") { return <React.Fragment>Submitted by <strong>{entry.actor}</strong></React.Fragment>; }
     if (entry.action === "Signatory assigned") {
       const signatory = entry.details.replace(/^Assigned to\s*/i, "");
       return <React.Fragment>Assigned to <strong>{signatory || "Authorised Signatory"}</strong></React.Fragment>;
     }
-    if (entry.action === "Request approved") { return <React.Fragment>Approved by <strong>{entry.actor}</strong></React.Fragment>; }
+    if ((entry.action === "Request supported" || entry.action === "Request approved")) { return <React.Fragment>Supported by <strong>{entry.actor}</strong></React.Fragment>; }
     if (entry.action === "Request rejected") { return <React.Fragment>Rejected by <strong>{entry.actor}</strong></React.Fragment>; }
     return <React.Fragment>{entry.action} by <strong>{entry.actor}</strong></React.Fragment>;
   };
   const actionIcon = (entry: IRequestHistoryEntry): React.ReactNode => {
     const path = entry.action === "Request submitted" ? "M12 18V6m-5 5 5-5 5 5" :
-      entry.action === "Request approved" ? "m6 12 4 4 8-8" :
+      (entry.action === "Request supported" || entry.action === "Request approved") ? "m6 12 4 4 8-8" :
       entry.action === "Request rejected" ? "m7 7 10 10M17 7 7 17" : "M12 6v6h5";
     return <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
   };

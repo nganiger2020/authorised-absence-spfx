@@ -1620,7 +1620,7 @@ button {
 
 
 
-.statusApproved {
+.statusSupported {
 
   background: #dff0e5;
 
@@ -1958,7 +1958,7 @@ button {
 
 
 
-.formPage .peoplePickerControl input[type="text"] {
+:is(.formPage, .aaReassignDialog) .peoplePickerControl input[type="text"] {
 
   width: 100%;
 
@@ -1986,7 +1986,7 @@ button {
 
 
 
-.formPage .peoplePickerControl input[type="text"]:focus {
+:is(.formPage, .aaReassignDialog) .peoplePickerControl input[type="text"]:focus {
 
   outline: 3px solid #ffbf47;
 
@@ -1998,7 +1998,7 @@ button {
 
 
 
-.formPage .peoplePickerControl input[type="text"]::placeholder {
+:is(.formPage, .aaReassignDialog) .peoplePickerControl input[type="text"]::placeholder {
 
   color: #777777;
 
@@ -3426,7 +3426,7 @@ button {
 
 
 
-  .formPage .peoplePickerControl input[type="text"] {
+  :is(.formPage, .aaReassignDialog) .peoplePickerControl input[type="text"] {
 
     max-width: 100%;
 
@@ -4070,7 +4070,7 @@ button {
 
 
 
-.cardApproved {
+.cardSupported {
 
   border-top-color: #00703c;
 
@@ -4078,7 +4078,7 @@ button {
 
 
 
-.cardApproved span {
+.cardSupported span {
 
   color: #00703c;
 
@@ -4086,7 +4086,7 @@ button {
 
 
 
-.cardApproved:hover {
+.cardSupported:hover {
 
   border-color: #00703c;
 
@@ -4178,7 +4178,7 @@ button {
 
 
 
-.cardApproved.selected {
+.cardSupported.selected {
 
   border-color: #00703c;
 
@@ -4910,7 +4910,7 @@ button {
 .authorisedAbsenceApp .uobDashboard .tableWrap tbody tr:hover { background: #f7f7f3; }
 .authorisedAbsenceApp .uobDashboard .tableWrap tbody td:first-child { font-weight: 600; white-space: nowrap; }
 .authorisedAbsenceApp .uobDashboard .pill { display: inline-block; padding: 5px 9px; max-width: 180px; white-space: normal; border-radius: 5px; font-size: 11px; line-height: 1.45; font-weight: 600; border: 1px solid #dededb; background: #f1f1ee; color: #333; }
-.authorisedAbsenceApp .uobDashboard .pill.statusApproved { background: #e5f2e9; color: #205535; border-color: #c7ddce; }
+.authorisedAbsenceApp .uobDashboard .pill.statusSupported { background: #e5f2e9; color: #205535; border-color: #c7ddce; }
 .authorisedAbsenceApp .uobDashboard .pill.statusRejected { background: #fae9eb; color: #8e2331; border-color: #edcdd2; }
 .authorisedAbsenceApp .uobDashboard .dashboardPerson { display: block; font-weight: 500; }
 .authorisedAbsenceApp .uobDashboard .dashboardPersonEmail { display: block; color: #666; font-size: 11px; margin-top: 3px; }
@@ -4948,7 +4948,7 @@ button {
 .authorisedAbsenceApp .uobDashboard .dashboardStatusField { flex: 0 1 300px; }
 .authorisedAbsenceApp .uobDashboard .pill.statusDraft { background: #f1f1ee; color: #454545; border-color: #d4d4ce; }
 .authorisedAbsenceApp .uobDashboard .pill.statusReview { background: #e7effa; color: #164b83; border-color: #bfcee2; }
-.authorisedAbsenceApp .uobDashboard .pill.statusApproved { background: #e5f2e9; color: #205535; border-color: #c7ddce; }
+.authorisedAbsenceApp .uobDashboard .pill.statusSupported { background: #e5f2e9; color: #205535; border-color: #c7ddce; }
 .authorisedAbsenceApp .uobDashboard .pill.statusRejected { background: #fae9eb; color: #8e2331; border-color: #edcdd2; }
 @media (max-width: 640px) {
   .authorisedAbsenceApp .uobDashboard .dashboardStatusField { flex: 1 1 100%; }
@@ -4958,14 +4958,14 @@ button {
 .authorisedAbsenceApp .uobDashboard .cards .cardAll { background: #fff; color: #1b1b1b; border-color: #bdbdb7; }
 .authorisedAbsenceApp .uobDashboard .cards .cardDraft { background: #f1f1ee; color: #454545; border-color: #d4d4ce; }
 .authorisedAbsenceApp .uobDashboard .cards .cardUnderReview { background: #e7effa; color: #164b83; border-color: #bfcee2; }
-.authorisedAbsenceApp .uobDashboard .cards .cardApproved { background: #e5f2e9; color: #205535; border-color: #c7ddce; }
+.authorisedAbsenceApp .uobDashboard .cards .cardSupported { background: #e5f2e9; color: #205535; border-color: #c7ddce; }
 .authorisedAbsenceApp .uobDashboard .cards .cardRejected { background: #fae9eb; color: #8e2331; border-color: #edcdd2; }
 .authorisedAbsenceApp .uobDashboard .cards .card .cardIcon { color: inherit; }
 .authorisedAbsenceApp .uobDashboard .cards .card.selected { box-shadow: inset 0 0 0 2px currentColor; }
 .authorisedAbsenceApp .uobDashboard .cards .cardAll.selected { background: #fff; color: #1b1b1b; border-color: #1b1b1b; }
 .authorisedAbsenceApp .uobDashboard .cards .cardDraft.selected { background: #f1f1ee; color: #454545; border-color: #454545; }
 .authorisedAbsenceApp .uobDashboard .cards .cardUnderReview.selected { background: #e7effa; color: #164b83; border-color: #164b83; }
-.authorisedAbsenceApp .uobDashboard .cards .cardApproved.selected { background: #e5f2e9; color: #205535; border-color: #205535; }
+.authorisedAbsenceApp .uobDashboard .cards .cardSupported.selected { background: #e5f2e9; color: #205535; border-color: #205535; }
 .authorisedAbsenceApp .uobDashboard .cards .cardRejected.selected { background: #fae9eb; color: #8e2331; border-color: #8e2331; }
 
 /* Reference image: centred status cards with colour top rules and a grey filter strip. */
@@ -4980,7 +4980,7 @@ button {
 .authorisedAbsenceApp .uobDashboard .cards .cardAll { --card-colour: #6b0c35; }
 .authorisedAbsenceApp .uobDashboard .cards .cardDraft { --card-colour: #70797c; }
 .authorisedAbsenceApp .uobDashboard .cards .cardUnderReview { --card-colour: #2072bc; }
-.authorisedAbsenceApp .uobDashboard .cards .cardApproved { --card-colour: #00783e; }
+.authorisedAbsenceApp .uobDashboard .cards .cardSupported { --card-colour: #00783e; }
 .authorisedAbsenceApp .uobDashboard .cards .cardRejected { --card-colour: #df2f1c; }
 .authorisedAbsenceApp .uobDashboard .cards .card .cardIcon { width: 34px; height: 34px; color: #333; flex: 0 0 34px; }
 .authorisedAbsenceApp .uobDashboard .cards .card .cardIcon svg { width: 34px; height: 34px; }
@@ -4991,7 +4991,7 @@ button {
 .authorisedAbsenceApp .uobDashboard .cards .cardAll.selected { background: #f7eef3; }
 .authorisedAbsenceApp .uobDashboard .cards .cardDraft.selected { background: #f2f3f3; }
 .authorisedAbsenceApp .uobDashboard .cards .cardUnderReview.selected { background: #edf4fb; }
-.authorisedAbsenceApp .uobDashboard .cards .cardApproved.selected { background: #edf6f0; }
+.authorisedAbsenceApp .uobDashboard .cards .cardSupported.selected { background: #edf6f0; }
 .authorisedAbsenceApp .uobDashboard .cards .cardRejected.selected { background: #fdf0ed; }
 .authorisedAbsenceApp .uobDashboard .cards .card:hover { border-color: var(--card-colour); background: #f7f7f7; box-shadow: none; }
 .authorisedAbsenceApp .uobDashboard .cards .card.selected:hover { box-shadow: inset 0 0 0 3px var(--card-colour); }
@@ -5167,3 +5167,55 @@ button {
   font-size: 14px; font-weight: 400; box-shadow: none;
 }
 .aaSingleSelectSearch input { min-height: 42px; padding: 9px 11px; border: 2px solid #555; border-radius: 2px; background: #fff; color: #1f1f1f; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
+
+/* Actions popup uses the same quiet surface and spacing as column filters. */
+.requestActionsMenu.requestActionsMenuPortal {
+  position: fixed; right: auto; bottom: auto; z-index: 100000;
+  box-sizing: border-box; width: 220px; max-width: calc(100vw - 16px);
+  padding: 0; overflow: hidden; border: 1px solid #c9c9c3; border-radius: 7px;
+  background: #fff; color: #242424; box-shadow: 0 8px 28px #0003;
+  font: 13px/1.45 "Manrope", Arial, sans-serif; text-align: left;
+}
+.requestActionsMenuPortal .requestActionsTitle { padding: 10px 14px; border-bottom: 1px solid #e1e1dc; background: #f5f5f2; color: #454545; font-size: 12px; font-weight: 600; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsItem {
+  display: flex; align-items: center; gap: 10px; box-sizing: border-box;
+  width: 100%; min-height: 40px; margin: 0; padding: 10px 14px;
+  border: 0; border-radius: 0; background: #fff; color: #242424;
+  font: inherit; text-align: left; box-shadow: none; cursor: pointer;
+}
+.requestActionsMenu.requestActionsMenuPortal .requestActionsIcon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 18px; width: 18px; height: 18px; color: #575757; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsIcon svg { width: 18px; height: 18px; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsLabel { font: inherit; color: inherit; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsDivider { height: 1px; margin: 0; background: #e1e1dc; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsItem:hover { background: #f3f3ef; color: #242424; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsDelete,
+.requestActionsMenu.requestActionsMenuPortal .requestActionsDelete .requestActionsIcon { color: #a52232; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsDelete:hover { background: #faeeee; color: #a52232; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsItem:focus-visible { outline: 2px solid #1b1b1b; outline-offset: -3px; background: #f3f3ef; }
+
+/* Student withdrawal action and confirmation. */
+.authorisedAbsenceApp .aaWithdrawFormAction { display: flex; justify-content: flex-end; margin: 0 0 16px; }
+.authorisedAbsenceApp .aaWithdrawFormAction .secondaryButton { color: #6b0c35; border-color: #6b0c35; }
+.aaWithdrawOverlay { position: fixed; inset: 0; z-index: 200000; background: #0007; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.aaWithdrawDialog { box-sizing: border-box; width: 100%; max-width: 540px; max-height: calc(100vh - 40px); overflow-y: auto; background: #fff; color: #242424; padding: 24px; border-radius: 8px; box-shadow: 0 8px 28px #0003; }
+.aaWithdrawDialog h2 { margin: 0 0 12px; font-size: 22px; }
+.aaWithdrawActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+.authorisedAbsenceApp .uobDashboard .cards .cardWithdrawn { --card-colour: #6c4f85; }
+.authorisedAbsenceApp .uobDashboard .cards .cardWithdrawn.selected { background: #f2edf7; }
+.authorisedAbsenceApp .uobDashboard .pill.statusWithdrawn { background: #f2edf7; color: #614275; border-color: #d9cde4; }
+.requestActionsMenu.requestActionsMenuPortal .requestActionsWithdraw { color: #6b0c35; }
+@media (min-width: 1101px) {
+  .authorisedAbsenceApp .uobDashboard .cards { grid-template-columns: repeat(7, minmax(0, 148px)); }
+}
+
+.authorisedAbsenceApp .uobDashboard .tableWrap .dashboardStudyCell { min-width: 125px; max-width: 180px; font-size: 12px; line-height: 1.4; }
+
+.aaReassignOverlay { position: fixed; inset: 0; z-index: 90000; display: flex; align-items: center; justify-content: center; padding: 20px; background: #0007; }
+.aaReassignDialog { box-sizing: border-box; width: 100%; max-width: 600px; max-height: calc(100vh - 40px); overflow-y: auto; padding: 24px; border-radius: 8px; background: #fff; color: #242424; box-shadow: 0 8px 28px #0003; font: 14px/1.5 Arial, sans-serif; }
+.aaReassignDialog h2 { margin: 0 0 12px; font-size: 22px; }
+.aaReassignKind { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px; margin: 16px 0; border: 1px solid #ccc; }
+.aaReassignKind label { display: flex; align-items: center; gap: 8px; }
+.aaReassignDialog textarea { display: block; box-sizing: border-box; width: 100%; padding: 9px 11px; margin-top: 7px; border: 2px solid #555; border-radius: 2px; font: inherit; }
+.aaReassignActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.authorisedAbsenceApp .aaReassignFormAction { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+

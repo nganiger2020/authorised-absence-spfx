@@ -1,10 +1,11 @@
 import { IRequest } from "./Models";
 import { workflowStatus } from "./Workflow";
 
-export type ColumnKey = "Id" | "Student" | "AbsenceStartDate" | "Reason" | "Status" | "Signatory" | "Admin";
+export type ColumnKey = "Id" | "Student" | "LevelOfStudy" | "AbsenceStartDate" | "Reason" | "Status" | "Signatory" | "Admin";
 export type CheckboxFilters = Partial<Record<ColumnKey, string[]>>;
 export const columns: Array<{ key: ColumnKey; label: string }> = [
   { key: "Id", label: "Request ID" }, { key: "Student", label: "Student" },
+  { key: "LevelOfStudy", label: "Level of Study" },
   { key: "AbsenceStartDate", label: "Absence Dates" }, { key: "Reason", label: "Reason" },
   { key: "Status", label: "Status" }, { key: "Signatory", label: "Signatory" }, { key: "Admin", label: "Administrator" }
 ];
@@ -17,6 +18,7 @@ export const columnValues = (request: IRequest, key: ColumnKey): string[] => {
   switch (key) {
     case "Id": return [request.Id ? "AA-" + request.Id : "-"];
     case "Student": return [(request.Student ? request.Student.Title : request.Title) || "-"];
+    case "LevelOfStudy": return [request.LevelOfStudy || "-"];
     case "AbsenceStartDate": return [dateLabel(request.AbsenceStartDate) + " – " + dateLabel(request.AbsenceEndDate)];
     case "Reason": return request.AbsenceReasons && request.AbsenceReasons.length ? request.AbsenceReasons : ["-"];
     case "Status": return [workflowStatus(request) || "-"];

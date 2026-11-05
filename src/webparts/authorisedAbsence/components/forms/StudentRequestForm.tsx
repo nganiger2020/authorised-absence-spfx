@@ -1,3 +1,4 @@
+import { IFormChoiceOptions } from "../../models/ChoiceOptions";
 import { SearchableSelect } from "../../controls/SearchableSelect";
 import { AppConfig } from "../../config/AppConfig";
 import { requiresEvidence, isAllowedEvidenceName } from "../../models/Evidence";
@@ -14,6 +15,8 @@ import { PeoplePicker } from "../../controls/PeoplePicker";
 import { AdminLookup, IAdminOption } from "../../controls/AdminLookup";
 interface Props {
   initial: IRequest;
+  fieldChoices: IFormChoiceOptions;
+  choicesLoading?: boolean;
   adminMode?: boolean;
   // Existing SharePoint users
   userOptions?: IUserOption[];
@@ -377,7 +380,7 @@ React.FC<Props> = (
     const retained = (request.AttachmentFiles || []).filter(file =>
       deletedFiles.indexOf(file.FileName) < 0 && isAllowedEvidenceName(file.FileName));
     if (requiresEvidence(request.AbsenceReasons) && retained.length + files.length === 0) {
-      addError(validation, "AttachmentFiles", "Upload supporting evidence for medical, family illness, bereavement or conference absence.");
+      addError(validation, "AttachmentFiles", "Upload supporting evidence for medical, family illness, bereavement, conference or Other absence reasons.");
     }
   };
   const validateCurrentStep =
@@ -1125,6 +1128,7 @@ React.FC<Props> = (
               </label>
               <SearchableSelect
                 id="levelOfStudy"
+                disabled={saving || props.choicesLoading || props.fieldChoices.LevelOfStudy.length === 0}
                 value={
                   request.LevelOfStudy ||
                   ""
@@ -1146,18 +1150,9 @@ React.FC<Props> = (
                   }
                 }
               >
-                <option value="">
-                  Select
-                </option>
-                <option value="Undergraduate">
-                  Undergraduate
-                </option>
-                <option value="Postgraduate Taught">
-                  Postgraduate Taught
-                </option>
-                <option value="Postgraduate Research">
-                  Postgraduate Research
-                </option>
+                <option value="">{props.choicesLoading ? "Loading options…" : "Select"}</option>
+                {request.LevelOfStudy && props.fieldChoices.LevelOfStudy.indexOf(request.LevelOfStudy || "") < 0 && <option value={request.LevelOfStudy} disabled>{request.LevelOfStudy} (existing value)</option>}
+                {props.fieldChoices.LevelOfStudy.map(choice => <option key={choice} value={choice}>{choice}</option>)}
               </SearchableSelect>
               {
                 getFieldError(
@@ -1408,8 +1403,10 @@ React.FC<Props> = (
               <label htmlFor="otherReason">
                 Other reason
               <span className="required">{" *"}</span></label>
+              <p id="otherReasonGuidance" className="hint">Explain your reason for absence. You must upload evidence that supports the Other reason described here.</p>
               <textarea
                 id="otherReason"
+                aria-describedby="otherReasonGuidance"
                 required
                 rows={4}
                 value={
@@ -1499,6 +1496,7 @@ React.FC<Props> = (
             </label>
             <SearchableSelect
               id="travelOutside"
+                disabled={saving || props.choicesLoading || props.fieldChoices.TravelOutside.length === 0}
               value={
                 request.TravelOutside ||
                 ""
@@ -1534,16 +1532,10 @@ React.FC<Props> = (
                 }
               }
             >
-              <option value="">
-                Select
-              </option>
-              <option value="Yes">
-                Yes
-              </option>
-              <option value="No">
-                No
-              </option>
-            </SearchableSelect>
+              <option value="">{props.choicesLoading ? "Loading options…" : "Select"}</option>
+                {request.TravelOutside && props.fieldChoices.TravelOutside.indexOf(request.TravelOutside || "") < 0 && <option value={request.TravelOutside} disabled>{request.TravelOutside} (existing value)</option>}
+                {props.fieldChoices.TravelOutside.map(choice => <option key={choice} value={choice}>{choice}</option>)}
+              </SearchableSelect>
             {
               getFieldError(
                 "TravelOutside"
@@ -1624,10 +1616,10 @@ React.FC<Props> = (
             Supporting evidence
           </h2>
           <p className="sectionIntro">
-            Upload supporting evidence relevant to the absence request.
+            Uploaded evidence must support the selected absence reason(s). If you select Other, the evidence must support the explanation you provide in Other reason.
           </p>
           <div className="infoBox" id="evidenceGuidance">
-            Evidence is required for medical, family illness, bereavement and conference reasons.
+            Evidence is required for medical, family illness, bereavement, conference and Other reasons.
             Accepted file types: {AppConfig.allowedExtensions.join(", ")}.
             Maximum file size: {AppConfig.maxAttachmentSizeMb} MB per file. Upload only evidence relevant to this request. Do not upload irrelevant, inappropriate or unnecessary personal information. EML files may be used for relevant email evidence.
           </div>
@@ -1851,7 +1843,7 @@ React.FC<Props> = (
             <h2 id="absenceNoticeTitle">{reasonNotice === "visa" ? "Extending Visa" : "Thesis – writing up in home country"}</h2>
             <p id="absenceNoticeMessage" style={{ lineHeight: 1.6 }}>
               {reasonNotice === "visa" ? (
-                "If you are a PGR and will not be engaging with your studies for a period of 1 month or more, you may want to consider applying for leave of absence rather than authorised absence. If approved, your registration dates would be extended in line with the duration of your leave of absence. You are advised to discuss the most appropriate course of action with your supervisor"
+                "If you are a PGR and will not be engaging with your studies for a period of 1 month or more, you may want to consider applying for leave of absence rather than authorised absence. If supported, your registration dates would be extended in line with the duration of your leave of absence. You are advised to discuss the most appropriate course of action with your supervisor"
               ) : (
                 <React.Fragment>
                   IMPORTANT! Please be aware that if you take authorised absence for this purpose, the University will be required to withdraw immigration sponsorship, and you will not be allowed to return to the University on your current Student route visa. If you have any concerns about what this would mean for you, we recommend you contact the International Student Team (IST){" "}

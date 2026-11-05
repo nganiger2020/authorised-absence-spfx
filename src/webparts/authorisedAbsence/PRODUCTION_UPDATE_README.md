@@ -20,7 +20,7 @@ Confirm these values match the tenant exactly before deployment:
 - Admin group: `Authorised Absence Admins`
 - Approver group: `Authorised Absence Approvers`
 - Stage choices: `Student`, `Signatory`, `Completed`
-- Status choices: `Draft`, `Pending Approval`, `Under Review`, `Approved`, `Rejected`
+- Status choices: `Draft`, `Pending Approval`, `Under Review`, `Supported`, `Rejected`
 - RequestApproved choices: `Yes`, `No`
 
 ## Security

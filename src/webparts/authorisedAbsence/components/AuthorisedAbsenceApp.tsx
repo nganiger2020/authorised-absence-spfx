@@ -1,5 +1,8 @@
+import { ReassignDialog } from "../controls/ReassignDialog";
+import { IFormChoiceOptions, emptyChoiceOptions } from "../models/ChoiceOptions";
+import { WithdrawDialog } from "../controls/WithdrawDialog";
 import { RequestHistory } from "./RequestHistory";
-import { canOpenWorkflow, workflowStage } from "../models/Workflow";
+import { canOpenWorkflow, canWithdrawRequest, canReassignAdministrator, canReassignSignatory, workflowStage } from "../models/Workflow";
 import * as React from "react";
 import {
   IRequest,
@@ -32,6 +35,12 @@ interface Props {
    ========================================================= */
 export const AuthorisedAbsenceApp:
   React.FC<Props> = (props) => {
+    const [reassignCandidate, setReassignCandidate] = React.useState<IRequest | undefined>(undefined);
+    const [reassigning, setReassigning] = React.useState(false);
+    const [reassignError, setReassignError] = React.useState("");
+    const [withdrawCandidate, setWithdrawCandidate] = React.useState<IRequest | undefined>(undefined);
+    const [withdrawing, setWithdrawing] = React.useState(false);
+    const [withdrawError, setWithdrawError] = React.useState("");
     const [deleteCandidate, setDeleteCandidate] = React.useState<IRequest | undefined>(undefined);
     const deleteModalRef = React.useRef<HTMLDivElement>(null);
     const [linkedRequestId] = React.useState<string | null>(() =>
@@ -68,6 +77,9 @@ export const AuthorisedAbsenceApp:
       React.useState<boolean>(true);
     const [error, setError] =
       React.useState<string>("");
+    const [fieldChoices, setFieldChoices] = React.useState<IFormChoiceOptions>(emptyChoiceOptions);
+    const [fieldChoicesLoading, setFieldChoicesLoading] = React.useState(false);
+    const [fieldChoicesError, setFieldChoicesError] = React.useState("");
     const [userOptions, setUserOptions] =
       React.useState<IUserOption[]>([]);
     const [adminOptions, setAdminOptions] =
@@ -202,8 +214,8 @@ export const AuthorisedAbsenceApp:
             (!!fullRequest.Student &&
               fullRequest.Student.Id === userId);
           if (
-            role === "Admin" ||
-            (status === "draft" && isOwner)
+            status !== "withdrawn" && (role === "Admin" ||
+            (status === "draft" && isOwner))
           ) {
             setView(
               "studentForm"
@@ -384,6 +396,11 @@ export const AuthorisedAbsenceApp:
           const dashboardItems = directRequestId !== undefined
             ? []
             : await props.service.getDashboard(resolvedRole, user.Id);
+          setFieldChoicesLoading(true);
+          setFieldChoicesError("");
+          try { setFieldChoices(await props.service.getFormChoiceOptions()); }
+          catch (choiceError) { setFieldChoices(emptyChoiceOptions()); setFieldChoicesError(getErrorMessage(choiceError, "Unable to load SharePoint dropdown choices.")); }
+          finally { setFieldChoicesLoading(false); }
           try {
             const studentReasonChoices = await props.service.getAbsenceReasonsChoices();
             setAbsenceReasonOptions(studentReasonChoices || []);
@@ -633,7 +650,7 @@ export const AuthorisedAbsenceApp:
           setError(
             getErrorMessage(
               err,
-              "Unable to approve the request."
+              "Unable to support the request."
             )
           );
           throw err;
@@ -779,6 +796,37 @@ export const AuthorisedAbsenceApp:
     /* =====================================================
        DELETE DRAFT
        ===================================================== */
+    const requestWithdrawal = (request: IRequest): void => {
+      if (!canWithdrawRequest(request, userId)) { return; }
+      setWithdrawError(""); setWithdrawCandidate(request);
+    };
+    const confirmWithdrawal = async (): Promise<void> => {
+      if (!withdrawCandidate || !withdrawCandidate.Id || withdrawing) { return; }
+      try {
+        setWithdrawing(true); setWithdrawError("");
+        const updated = await props.service.withdraw(withdrawCandidate.Id);
+        if (selected && selected.Id === updated.Id) { setSelected(updated); setView("view"); }
+        setWithdrawCandidate(undefined);
+        try { await refreshDashboard(); } catch (err) { setError(getErrorMessage(err, "The request was withdrawn. Refresh to update the dashboard.")); }
+      } catch (err) { setWithdrawError(getErrorMessage(err, "Unable to withdraw the request.")); }
+      finally { setWithdrawing(false); }
+    };
+    const requestReassignment = (request: IRequest): void => {
+      if (!canReassignAdministrator(request, role, userEmail, userId)) { return; }
+      setReassignError(""); setReassignCandidate(request);
+    };
+    const confirmReassignment = async (kind: "administrator" | "signatory", id: number, reason: string): Promise<void> => {
+      if (!reassignCandidate || !reassignCandidate.Id || reassigning) { return; }
+      try {
+        setReassigning(true); setReassignError("");
+        const updated = kind === "administrator" ? await props.service.reassignAdministrator(reassignCandidate.Id, id, reason)
+          : await props.service.reassignSignatory(reassignCandidate.Id, id, reason);
+        if (selected && selected.Id === updated.Id) { setSelected(updated); setView("view"); }
+        setReassignCandidate(undefined);
+        try { await refreshDashboard(); } catch (err) { setError(getErrorMessage(err, "The request was reassigned. Refresh to update the dashboard.")); }
+      } catch (err) { setReassignError(getErrorMessage(err, "Unable to reassign the request.")); }
+      finally { setReassigning(false); }
+    };
     const deleteRequest =
       async (
         request: IRequest
@@ -1063,14 +1111,8 @@ export const AuthorisedAbsenceApp:
                   </div>
                 )
               }
-            </div>
-            {/* =============================================
-              TRAVEL / LETTER
-             ============================================= */}
-            <div className="reviewSection">
-              <h3>
-                Travel / Letter
-              </h3>
+              {(selected.AbsenceReasons || []).indexOf("Family illness") >= 0 && <div className="reviewRow"><div className="reviewKey">Family Illness Details</div><div className="reviewValue">{selected.FamilyIllnessDetails || "—"}</div></div>}
+              {(selected.AbsenceReasons || []).indexOf("Medical") >= 0 && <div className="reviewRow"><div className="reviewKey">Medical Evidence Details</div><div className="reviewValue">{selected.MedicalEvidenceDetails || "—"}</div></div>}
               <div className="reviewRow">
                 <div className="reviewKey">
                   Travelling Outside UK
@@ -1083,8 +1125,7 @@ export const AuthorisedAbsenceApp:
                 </div>
               </div>
               {
-                selected
-                  .TravelOutsideDetails &&
+                selected.TravelOutside === "Yes" &&
                 (
                   <div className="reviewRow">
                     <div className="reviewKey">
@@ -1094,35 +1135,6 @@ export const AuthorisedAbsenceApp:
                       {
                         selected
                           .TravelOutsideDetails
-                      }
-                    </div>
-                  </div>
-                )
-              }
-              <div className="reviewRow">
-                <div className="reviewKey">
-                  Approval Letter
-                </div>
-                <div className="reviewValue">
-                  {
-                    selected
-                      .letterofconfirmationforauthorise ||
-                    "-"
-                  }
-                </div>
-              </div>
-              {
-                selected
-                  .Reasonforrequestingaletter &&
-                (
-                  <div className="reviewRow">
-                    <div className="reviewKey">
-                      Letter Reason
-                    </div>
-                    <div className="reviewValue">
-                      {
-                        selected
-                          .Reasonforrequestingaletter
                       }
                     </div>
                   </div>
@@ -1181,7 +1193,7 @@ export const AuthorisedAbsenceApp:
             {
               (
                 selected.Status ===
-                "Approved" ||
+                "Supported" ||
                 selected.Status ===
                 "Rejected"
               ) &&
@@ -1290,7 +1302,12 @@ export const AuthorisedAbsenceApp:
           role={role}
           items={items}
           loading={loading}
+          statusOptions={fieldChoices.Status}
+          choicesLoading={fieldChoicesLoading}
           currentUserEmail={userEmail}
+          currentUserId={userId}
+          onWithdraw={requestWithdrawal}
+          onReassign={requestReassignment}
           onNew={
             newRequest
           }
@@ -1340,6 +1357,8 @@ export const AuthorisedAbsenceApp:
       content = (
         <StudentRequestForm
           initial={selected}
+          fieldChoices={fieldChoices}
+          choicesLoading={fieldChoicesLoading}
           adminMode={role === "Admin"}
           userOptions={userOptions}
           adminOptions={adminOptions}
@@ -1458,6 +1477,13 @@ export const AuthorisedAbsenceApp:
         {/* =================================================
           MAIN CONTENT
          ================================================= */}
+        {reassignCandidate && <ReassignDialog request={reassignCandidate} busy={reassigning} error={reassignError}
+          allowAdmin={canReassignAdministrator(reassignCandidate, role, userEmail, userId)} allowSignatory={canReassignSignatory(reassignCandidate, role, userEmail, userId)}
+          admins={adminOptions} adminsLoading={adminOptionsLoading} onSearch={searchUsers} onResolve={resolveUser}
+          onCancel={() => { if (!reassigning) { setReassignCandidate(undefined); } }}
+          onConfirm={(kind, id, reason) => { confirmReassignment(kind, id, reason).catch((err: unknown) => setReassignError(getErrorMessage(err, "Unable to reassign the request."))); }} />}
+        {withdrawCandidate && withdrawCandidate.Id && <WithdrawDialog requestId={withdrawCandidate.Id} busy={withdrawing} error={withdrawError}
+          onCancel={() => { if (!withdrawing) { setWithdrawCandidate(undefined); } }} onConfirm={() => { confirmWithdrawal().catch((err: unknown) => setWithdrawError(getErrorMessage(err, "Unable to withdraw the request."))); }} />}
         {!readOnlyLink && deleteCandidate && (
           <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: 0, zIndex: 10000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
             <div ref={deleteModalRef} role="dialog" aria-modal="true" aria-labelledby="deleteRequestTitle" aria-describedby="deleteRequestMessage"
@@ -1496,6 +1522,13 @@ export const AuthorisedAbsenceApp:
               </div>
             )
           }
+          {fieldChoicesError && <div className="error" role="alert">{fieldChoicesError}</div>}
+          {!readOnlyLink && selected && view !== "dashboard" && !loading && canReassignAdministrator(selected, role, userEmail, userId) && (
+            <div className="aaReassignFormAction"><button type="button" className="secondaryButton" disabled={reassigning} onClick={() => requestReassignment(selected)}>Reassign request</button></div>
+          )}
+          {selected && view !== "dashboard" && !loading && canWithdrawRequest(selected, userId) && (
+            <div className="aaWithdrawFormAction"><button type="button" className="secondaryButton" disabled={withdrawing} onClick={() => requestWithdrawal(selected)}>Withdraw request</button></div>
+          )}
           {/* ===============================================
             LOADING
            =============================================== */}

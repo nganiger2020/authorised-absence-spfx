@@ -17,6 +17,6 @@ export const matchesDashboardSearch = (request: IRequest, search: string): boole
     request.AbsenceStartDate, request.AbsenceEndDate,
     (request.AbsenceReasons || []).join(", "), workflowStatus(request),
     request.Signatory && request.Signatory.Title, request.Signatory && request.Signatory.EMail,
-    request.AdminTitle, request.AdminLabel, request.Programme
+    request.AdminTitle, request.AdminLabel, request.Programme, request.LevelOfStudy
   ].some(value => (value || "").toLowerCase().indexOf(query) >= 0);
 };

@@ -5,10 +5,7 @@ import {
   IUserOption
 } from "../../models/Models";
 import { PeoplePicker } from "../../controls/PeoplePicker";
-import {
-  AdminLookup,
-  IAdminOption
-} from "../../controls/AdminLookup";
+import { IAdminOption } from "../../controls/AdminLookup";
 interface Props {
   request: IRequest;
   adminMode?: boolean;
@@ -89,14 +86,8 @@ React.FC<Props> = (props) => {
           }
         : undefined
     );
-  const [adminLabel, setAdminLabel] =
-    React.useState<string>(
-      props.request.AdminLabel || ""
-    );
-  const [adminId, setAdminId] =
-    React.useState<number | undefined>(
-      props.request.AdminId || undefined
-    );
+  const adminLabel = props.request.AdminLabel || "";
+  const adminId = props.request.AdminId;
   /* =====================================================
      DATE FORMAT
      ===================================================== */
@@ -146,13 +137,13 @@ React.FC<Props> = (props) => {
         );
       } catch (err) {
         console.error(
-          "Unable to approve request.",
+          "Unable to support request.",
           err
         );
         setError(
           getErrorMessage(
             err,
-            "Unable to approve the request."
+            "Unable to support the request."
           )
         );
         window.scrollTo(
@@ -288,7 +279,7 @@ React.FC<Props> = (props) => {
       }
       if (!decision) {
         setError(
-          "Select Approve or Reject."
+          "Select Support or Reject."
         );
         window.scrollTo(
           0,
@@ -334,7 +325,7 @@ React.FC<Props> = (props) => {
         setSaving(true);
         setError("");
         if (
-          decision === "Approve"
+          decision === "Support"
         ) {
           await props.onApprove(
             comments.trim(),
@@ -714,14 +705,6 @@ React.FC<Props> = (props) => {
             </div>
           )
         }
-      </div>
-      {/* ===============================================
-          TRAVEL DETAILS
-         =============================================== */}
-      <div className="reviewSection">
-        <h2>
-          Travel Details
-        </h2>
         <div className="reviewRow">
           <div className="reviewKey">
             Travelling Outside UK
@@ -851,38 +834,6 @@ React.FC<Props> = (props) => {
         </div>
       </div>
       {/* ===============================================
-          ADMIN ASSIGNMENT
-         =============================================== */}
-      {
-        props.adminMode && assignmentStage &&
-        (
-          <div className="reviewSection adminSection">
-            <h2>Admin Assignment</h2>
-            <AdminLookup
-              valueLabel={adminLabel}
-              valueId={adminId}
-              options={props.adminOptions || []}
-              loading={props.adminOptionsLoading}
-              required
-              disabled={saving}
-              onChange={(value?: IAdminOption): void => {
-                const label = value ? value.label : "";
-                const id = value ? value.id : undefined;
-                setAdminLabel(label);
-                setAdminId(id);
-                setError("");
-                if (props.onAdminChange) {
-                  void props.onAdminChange(
-                    label,
-                    id
-                  );
-                }
-              }}
-            />
-          </div>
-        )
-      }
-      {/* ===============================================
           DECISION
          =============================================== */}
       {!assignmentStage && (
@@ -906,21 +857,21 @@ React.FC<Props> = (props) => {
             <input
               type="radio"
               name="decision"
-              value="Approve"
+              value="Support"
               checked={
-                decision === "Approve"
+                decision === "Support"
               }
               onChange={
                 () => {
                   setDecision(
-                    "Approve"
+                    "Support"
                   );
                   setError("");
                 }
               }
             />
             <span>
-              Approve request
+              Support request
             </span>
           </label>
           <label className="check">
@@ -1023,7 +974,7 @@ React.FC<Props> = (props) => {
           }}
         >
           {
-            saving ? "Saving..." : assignmentStage ? "Submit to Authorised Signatory" : decision === "Reject" ? "Reject Request" : "Approve Request"
+            saving ? "Saving..." : assignmentStage ? "Submit to Authorised Signatory" : decision === "Reject" ? "Reject Request" : "Support Request"
           }
         </button>
       </div>

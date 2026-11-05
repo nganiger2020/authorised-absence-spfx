@@ -212,7 +212,7 @@
         },
         {
             "InternalName": "RequestApproved",
-            "Title": "2G. Absence Request Approved",
+            "Title": "2G. Absence Request Supported",
             "TypeAsString": "Choice"
         },
         {

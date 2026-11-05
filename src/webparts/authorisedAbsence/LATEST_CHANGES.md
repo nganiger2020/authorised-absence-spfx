@@ -1,5 +1,5 @@
-# Latest update: dropdowns styled like textboxes
+# Latest update: replacement signatory matches Student name picker
 
-Searchable single-selection dropdowns now match the form text fields: white backgrounds, dark 2px borders, 2px corners, matching padding, width, spacing and 16px Arial text. The dashboard Status picker matches its neighbouring search textbox, including height and square corners. Page-size control retains the compact dashboard field style. Popup search inputs use the same textbox styling.
+The New authorised signatory field in the reassignment dialog now shares the Student name picker's exact input styles: size, padding, dark border, typography, placeholder, focus outline and responsive rules. Both already use the same PeoplePicker component, so directory results, checkbox-style indicators, selected-person name/email/avatar and Clear behaviour are consistent.
 
-Search, one-checkbox selection, lookup saving, filtering and all existing functionality are unchanged. CSS parsing passed. Browser visual verification remains recommended in the target SPFx page.
+Search, single-person selection, reassignment validation, staff permissions and lookup/workflow saving are unchanged. CSS parsing and rendered reassignment interaction checks passed.

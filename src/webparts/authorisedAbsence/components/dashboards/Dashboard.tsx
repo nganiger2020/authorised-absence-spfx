@@ -2,7 +2,7 @@ import { SearchableSelect } from "../../controls/SearchableSelect";
 import { ColumnFilter } from "../../controls/ColumnFilter";
 import { ColumnKey, CheckboxFilters, columns, columnValues, matchesCheckboxFilters, compareColumn } from "../../models/DashboardColumnFilters";
 import { matchesDashboardSearch } from "../../models/DashboardSearch";
-import { canOpenWorkflow, workflowStatus } from "../../models/Workflow";
+import { canOpenWorkflow, canWithdrawRequest, canReassignAdministrator, workflowStatus } from "../../models/Workflow";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import {
@@ -14,6 +14,11 @@ interface Props {
   items: IRequest[];
   loading: boolean;
   currentUserEmail: string;
+  currentUserId: number;
+  statusOptions: string[];
+  choicesLoading?: boolean;
+  onWithdraw: (request: IRequest) => void;
+  onReassign: (request: IRequest) => void;
   onNew: () => void;
   onOpen: (request: IRequest) => void;
   onReview: (request: IRequest) => void;
@@ -46,7 +51,10 @@ const displayDate = (value?: string): string => {
 const getStatusClass = (status?: string): string => {
   switch (normalize(status)) {
     case "approved":
-      return "pill statusApproved";
+    case "supported":
+      return "pill statusSupported";
+    case "withdrawn":
+      return "pill statusWithdrawn";
     case "rejected":
       return "pill statusRejected";
     case "under review with administrator":
@@ -117,8 +125,8 @@ export const Dashboard: React.FC<Props> = (props) => {
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
-    const menuWidth = 200;
-    const menuHeight = 135;
+    const menuWidth = 220;
+    const menuHeight = 235;
     const gap = 6;
     const padding = 8;
     let left = rect.right - menuWidth;
@@ -149,19 +157,22 @@ export const Dashboard: React.FC<Props> = (props) => {
       Draft: 0,
       "Under Review with Administrator": 0,
       "Under Review with Signatory": 0,
-      Approved: 0,
-      Rejected: 0
+      Supported: 0,
+      Rejected: 0,
+      Withdrawn: 0
     };
     props.items.forEach((item: IRequest) => {
-      const status = normalize(item.Status);
+      const status = normalize(workflowStatus(item));
       if (status === "draft") {
         result.Draft++;
       } else if (isReviewableStatus(item.Status)) {
         if (workflowStatus(item) === "Under Review with Signatory") {
           result["Under Review with Signatory"]++;
         } else { result["Under Review with Administrator"]++; }
-      } else if (status === "approved") {
-        result.Approved++;
+      } else if (status === "supported") {
+        result.Supported++;
+      } else if (status === "withdrawn") {
+        result.Withdrawn++;
       } else if (status === "rejected") {
         result.Rejected++;
       }
@@ -175,7 +186,8 @@ export const Dashboard: React.FC<Props> = (props) => {
       if (statusFilter === "Draft") {
         statusMatches = status === "draft";
       } else if (statusFilter !== "All") {
-        statusMatches = normalize(workflowStatus(request)) === normalize(statusFilter);
+        statusMatches = status === normalize(statusFilter) || normalize(workflowStatus(request)) === normalize(statusFilter) ||
+          ((normalize(statusFilter) === "approved" || normalize(statusFilter) === "supported") && workflowStatus(request) === "Supported");
       }
       if (!statusMatches || !matchesDashboardSearch(request, search) || !matchesCheckboxFilters(request, columnFilters)) {
         return false;
@@ -256,13 +268,17 @@ export const Dashboard: React.FC<Props> = (props) => {
       )
     },
     {
-      label: "Approved",
-      count: counts.Approved,
+      label: "Supported",
+      count: counts.Supported,
       icon: (
         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" focusable="false">
           <circle cx="12" cy="12" r="9" /><path d="M8 12.2l2.5 2.5L16.5 9" />
         </svg>
       )
+    },
+    {
+      label: "Withdrawn", count: counts.Withdrawn,
+      icon: <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M9 5 3 11l6 6M3 11h11a6 6 0 0 1 6 6v2" /></svg>
     },
     {
       label: "Rejected",
@@ -338,9 +354,11 @@ export const Dashboard: React.FC<Props> = (props) => {
         </div>
         <div className="dashboardFilterField dashboardStatusField">
           <label htmlFor="dashboardStatus">Status</label>
-          <SearchableSelect id="dashboardStatus" value={statusFilter} aria-controls="dashboardRequests"
+          <SearchableSelect id="dashboardStatus" disabled={props.choicesLoading} value={statusFilter} aria-controls="dashboardRequests"
             onValueChange={selectedValue => { closeActionMenu(); setStatusFilter(selectedValue); }}>
-            {cards.map(card => <option key={card.label} value={card.label}>{card.label}</option>)}
+            <option value="All">All</option>
+            {statusFilter !== "All" && props.statusOptions.indexOf(statusFilter) < 0 && <option value={statusFilter} disabled>{statusFilter} (current filter)</option>}
+            {props.statusOptions.map(choice => <option key={choice} value={choice}>{normalize(choice) === "approved" ? "Supported" : choice}</option>)}
           </SearchableSelect>
         </div>
         <div className="dashboardFilterActions">
@@ -408,7 +426,7 @@ export const Dashboard: React.FC<Props> = (props) => {
                 </tr>
               </thead>
               <tbody>
-                {pageItems.length === 0 && <tr><td colSpan={7} role="status">No requests match the selected filters.</td></tr>}
+                {pageItems.length === 0 && <tr><td colSpan={8} role="status">No requests match the selected filters.</td></tr>}
                 {pageItems.map((request: IRequest) => {
                   const reviewAllowed = canReview(request);
                   const isDraft = normalize(request.Status) === "draft";
@@ -452,6 +470,7 @@ export const Dashboard: React.FC<Props> = (props) => {
                                   event.stopPropagation();
                                 }}
                               >
+                                <div className="requestActionsTitle" role="presentation">Request AA-{request.Id}</div>
                                 {reviewAllowed ? (
                                   <button
                                     type="button"
@@ -502,6 +521,20 @@ export const Dashboard: React.FC<Props> = (props) => {
                                     </span>
                                   </button>
                                 )}
+                                {canReassignAdministrator(request, props.role, props.currentUserEmail, props.currentUserId) && <>
+                                  <div className="requestActionsDivider" aria-hidden="true" />
+                                  <button type="button" role="menuitem" className="requestActionsItem" onClick={() => { closeActionMenu(); props.onReassign(request); }}>
+                                    <span className="requestActionsIcon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" /></svg></span>
+                                    <span className="requestActionsLabel">Reassign request</span>
+                                  </button>
+                                </>}
+                                {canWithdrawRequest(request, props.currentUserId) && <>
+                                  <div className="requestActionsDivider" aria-hidden="true" />
+                                  <button type="button" role="menuitem" className="requestActionsItem requestActionsWithdraw" onClick={() => { closeActionMenu(); props.onWithdraw(request); }}>
+                                    <span className="requestActionsIcon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9 5 3 11l6 6M3 11h11a6 6 0 0 1 6 6v2" /></svg></span>
+                                    <span className="requestActionsLabel">Withdraw request</span>
+                                  </button>
+                                </>}
                                 {(props.role === "Admin" || isDraft) && (
                                   <>
                                     <div className="requestActionsDivider" aria-hidden="true" />
@@ -537,6 +570,7 @@ export const Dashboard: React.FC<Props> = (props) => {
                           ? request.Student.Title
                           : request.Title || "-"}
                       </td>
+                      <td className="dashboardStudyCell">{request.LevelOfStudy || "-"}</td>
                       <td>
                         {displayDate(request.AbsenceStartDate)} – {displayDate(request.AbsenceEndDate)}
                       </td>
@@ -588,5 +622,6 @@ export const Dashboard: React.FC<Props> = (props) => {
   );
 };
 export default Dashboard;
+
 
 

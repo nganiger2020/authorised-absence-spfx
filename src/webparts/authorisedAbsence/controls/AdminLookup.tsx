@@ -8,6 +8,7 @@ export interface IAdminOption {
   email?: string;
 }
 interface Props {
+  id?: string;
   valueLabel?: string;
   valueId?: number;
   options: IAdminOption[];
@@ -18,12 +19,13 @@ interface Props {
   onChange: (value?: IAdminOption) => void;
 }
 export const AdminLookup: React.FC<Props> = props => {
+  const id = props.id || "admin";
   const hasSelectedOption = props.options.some(option => option.id === props.valueId);
   return <div className="formGroup">
-    <label htmlFor="admin">Admin{props.required && <span className="required"> *</span>}</label>
-    <SearchableSelect id="admin" value={props.valueId || ""} disabled={props.disabled || props.loading}
+    <label htmlFor={id}>Admin{props.required && <span className="required"> *</span>}</label>
+    <SearchableSelect id={id} value={props.valueId || ""} disabled={props.disabled || props.loading}
       aria-required={props.required} aria-invalid={!!props.error}
-      aria-describedby={props.error ? "adminError" : undefined}
+      aria-describedby={props.error ? id + "Error" : undefined}
       onValueChange={selectedValue => {
         const id = Number(selectedValue);
         props.onChange(props.options.filter(option => option.id === id)[0]);
@@ -37,7 +39,7 @@ export const AdminLookup: React.FC<Props> = props => {
       })}
     </SearchableSelect>
     {!props.loading && props.options.length === 0 && <div className="hint">No administrators available. Check the Admins list and Email values.</div>}
-    {props.error && <div id="adminError" className="errorMessage" role="alert">{props.error}</div>}
+    {props.error && <div id={id + "Error"} className="errorMessage" role="alert">{props.error}</div>}
   </div>;
 };
 
